@@ -3,18 +3,17 @@
 #include <endian.h>
 #include <string.h>
 
-#include "psbt.h"
-#include "common.h"
+#include "compactsize.h"
 
-u32 compactsize_length(u64 size) {
-	if (size < 253)
-		return sizeof(unsigned char);
-	else if (size <= USHRT_MAX)
-		return sizeof(unsigned char) + sizeof(unsigned short);
-	else if (size <= UINT_MAX)
-		return sizeof(unsigned char) + sizeof(unsigned int);
+u32 compactsize_length(u64 data) {
+	if (data < 253)
+		return sizeof(u8);
+	else if (data <= USHRT_MAX)
+		return sizeof(u8) + sizeof(u16);
+	else if (data <= UINT_MAX)
+		return sizeof(u8) + sizeof(u32);
 	else
-		return sizeof(unsigned char) + sizeof(uint64_t);
+		return sizeof(u8) + sizeof(u64);
 }
 
 inline void serialize_u8(u8 *dest, u8 data) {
@@ -115,5 +114,5 @@ u64 compactsize_read(u8 *data, enum psbt_result *err) {
 	if (ret_size > (u64)MAX_SERIALIZE_SIZE)
 		READERR("non-canonical compactsize_read()");
 
-	return ret_size;
+
 }
