@@ -7,13 +7,16 @@
 enum psbt_result {
 	PSBT_OK,
 	PSBT_COMPACT_READ_ERROR,
+	PSBT_INVALID_STATE,
 	PSBT_OUT_OF_BOUNDS_WRITE
 };
 
 enum psbt_state {
-	PSBT_ST_INIT,
+	PSBT_ST_INIT = 2,
 	PSBT_ST_GLOBAL,
-	PSBT_ST_INPUTS
+	PSBT_ST_INPUTS,
+	PSBT_ST_INPUTS_NEW,
+	PSBT_ST_FINISHED,
 };
 
 struct psbt {
@@ -35,10 +38,16 @@ size_t
 psbt_size(struct psbt *tx);
 
 enum psbt_result
-psbt_write_record(struct psbt *tx, struct psbt_record *rec);
+psbt_write_global_record(struct psbt *tx, struct psbt_record *rec);
+
+enum psbt_result
+psbt_write_input_record(struct psbt *tx, struct psbt_record *rec);
 
 enum psbt_result
 psbt_init(struct psbt *tx, unsigned char *dest, size_t dest_size);
+
+enum psbt_result
+psbt_finalize(struct psbt *tx);
 
 #define PSBT_MAGIC 0x70736274
 

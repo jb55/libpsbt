@@ -42,6 +42,7 @@ psbt_init(struct psbt *tx, unsigned char *dest, size_t dest_size) {
 	tx->write_pos = dest;
 	tx->data = dest;
 	tx->data_capacity = dest_size;
+	tx->state = PSBT_ST_INIT;
 	return psbt_begin(tx);
 }
 
@@ -52,7 +53,33 @@ psbt_init(struct psbt *tx, unsigned char *dest, size_t dest_size) {
 /* 	*dest =  */
 /* } */
 
+
 enum psbt_result
+psbt_close_records(struct psbt *tx) {
+	ASSERT_SPACE(1);
+	*tx->write_pos = '\0';
+	tx->write_pos++;
+	return PSBT_OK;
+}
+
+
+enum psbt_result
+psbt_finalize(struct psbt *tx) {
+	enum psbt_result res;
+
+	if (tx->state != PSBT_ST_INPUTS_NEW && tx->state != PSBT_ST_INPUTS) {
+		psbt_errmsg = "psbt_finalize: no input records found";
+		return PSBT_INVALID_STATE;
+	}
+
+	res = psbt_close_records(tx);
+	if (res != PSBT_OK)
+		return res;
+
+	return PSBT_OK;
+}
+
+static enum psbt_result
 psbt_write_record(struct psbt *tx, struct psbt_record *rec) {
 	u32 size;
 
@@ -81,3 +108,60 @@ psbt_write_record(struct psbt *tx, struct psbt_record *rec) {
 
 	return PSBT_OK;
 }
+
+enum psbt_result
+psbt_write_global_record(struct psbt *tx, struct psbt_record *rec) {
+	if (tx->state == PSBT_ST_INIT) {
+		tx->state = PSBT_ST_GLOBAL;
+	}
+	else if (tx->state != PSBT_ST_GLOBAL) {
+		psbt_errmsg = "psbt_write_global_record: you can only write a "
+			"global record after psbt_init and before "
+			"psbt_write_input_record";
+		return PSBT_INVALID_STATE;
+	}
+
+	return psbt_write_record(tx, rec);
+}
+
+enum psbt_result
+psbt_new_input_record_set(struct psbt *tx) {
+	enum psbt_result res;
+	if (tx->state == PSBT_ST_GLOBAL
+	 || tx->state == PSBT_ST_INPUTS_NEW
+	 || tx->state == PSBT_ST_INPUTS) {
+		res = psbt_close_records(tx);
+		if (res != PSBT_OK)
+			return res;
+		tx->state = PSBT_ST_INPUTS_NEW;
+		return PSBT_OK;
+	}
+	else if (tx->state != PSBT_ST_INPUTS) {
+		psbt_errmsg = "psbt_new_input_record_set: "
+			"this can only be called after psbt_write_global_record "
+			"or after psbt_write_input_record";
+		return PSBT_INVALID_STATE;
+	}
+
+	return psbt_close_records(tx);
+}
+
+enum psbt_result
+psbt_write_input_record(struct psbt *tx, struct psbt_record *rec) {
+	enum psbt_result res;
+	if (tx->state == PSBT_ST_GLOBAL) {
+		// close global records
+		if ((res = psbt_close_records(tx)) != PSBT_OK)
+			return res;
+		tx->state = PSBT_ST_INPUTS;
+	}
+	else if (tx->state != PSBT_ST_INPUTS && tx->state != PSBT_ST_INPUTS_NEW) {
+		psbt_errmsg = "psbt_write_input_record: attempting to write an "
+			"input record before any global records have been written."
+			" use psbt_write_global_record first";
+		return PSBT_INVALID_STATE;
+	}
+
+	return psbt_write_record(tx, rec);
+}
+
