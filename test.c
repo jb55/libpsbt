@@ -37,6 +37,9 @@ int main(int argc, char *argv[])
 	res = psbt_init(&psbt, buffer, 1024);
 	CHECKRES(res);
 
+	res = psbt_write_input_record(&psbt, &rec);
+	assert(res == PSBT_INVALID_STATE);
+
 	rec.type     = PSBT_TYPE_TRANSACTION;
 	rec.key      = NULL;
 	rec.key_size = 0;
@@ -73,13 +76,15 @@ int main(int argc, char *argv[])
 	res = psbt_write_input_record(&psbt, &rec);
 	CHECKRES(res);
 
+	res = psbt_print(&psbt, stdout);
+	assert(res == PSBT_INVALID_STATE);
+
 	res = psbt_finalize(&psbt);
 	CHECKRES(res);
 
-	size_t size = psbt_size(&psbt);
-	for (size_t i = 0; i < size; ++i)
-		printf("%02x", psbt.data[i]);
-	printf("\n");
+	res = psbt_print(&psbt, stdout);
+	CHECKRES(res);
+
 
 	return 0;
 }

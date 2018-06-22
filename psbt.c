@@ -76,6 +76,8 @@ psbt_finalize(struct psbt *tx) {
 	if (res != PSBT_OK)
 		return res;
 
+	tx->state = PSBT_ST_FINALIZED;
+
 	return PSBT_OK;
 }
 
@@ -144,6 +146,22 @@ psbt_new_input_record_set(struct psbt *tx) {
 	}
 
 	return psbt_close_records(tx);
+}
+
+
+enum psbt_result
+psbt_print(struct psbt *tx, FILE *stream) {
+	if (tx->state != PSBT_ST_FINALIZED) {
+		psbt_errmsg = "psbt_print: transaction is not finished";
+		return PSBT_INVALID_STATE;
+	}
+
+	size_t size = psbt_size(tx);
+	for (size_t i = 0; i < size; ++i)
+		fprintf(stream, "%02x", tx->data[i]);
+	printf("\n");
+
+	return PSBT_OK;
 }
 
 enum psbt_result

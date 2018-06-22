@@ -3,6 +3,7 @@
 #define PSBT_H
 
 #include <stddef.h>
+#include <stdio.h>
 
 enum psbt_result {
 	PSBT_OK,
@@ -16,7 +17,7 @@ enum psbt_state {
 	PSBT_ST_GLOBAL,
 	PSBT_ST_INPUTS,
 	PSBT_ST_INPUTS_NEW,
-	PSBT_ST_FINISHED,
+	PSBT_ST_FINALIZED,
 };
 
 struct psbt {
@@ -48,6 +49,9 @@ psbt_new_input_record_set(struct psbt *tx);
 
 enum psbt_result
 psbt_init(struct psbt *tx, unsigned char *dest, size_t dest_size);
+
+enum psbt_result
+psbt_print(struct psbt *tx, FILE *stream);
 
 enum psbt_result
 psbt_finalize(struct psbt *tx);
