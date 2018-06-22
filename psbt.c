@@ -17,7 +17,7 @@ char *psbt_errmsg = NULL;
 
 
 size_t psbt_size(struct psbt *tx) {
-	return tx->write_pos - tx->data -1;
+	return tx->write_pos - tx->data;
 }
 
 
