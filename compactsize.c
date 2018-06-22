@@ -1,4 +1,6 @@
 
+#define _DEFAULT_SOURCE
+
 #include <limits.h>
 #include <endian.h>
 #include <string.h>
@@ -41,7 +43,7 @@ inline u8 deserialize_u8(u8 *src) {
 
 inline u16 deserialize_u16(u8 *src) {
 	u16 data;
-	memcpy(&data, src, 2);
+	memcpy(&data, src, sizeof(data));
 	return le16toh(data);
 }
 
@@ -114,5 +116,5 @@ u64 compactsize_read(u8 *data, enum psbt_result *err) {
 	if (ret_size > (u64)MAX_SERIALIZE_SIZE)
 		READERR("non-canonical compactsize_read()");
 
-
+	return ret_size;
 }
