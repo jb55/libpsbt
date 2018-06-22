@@ -5,7 +5,7 @@
 
 ## Installation
 
-    $ make install
+    $ make install PREFIX=out_dir
 
 ## Example
 
