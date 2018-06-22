@@ -140,8 +140,9 @@ psbt_new_input_record_set(struct psbt *tx) {
 	}
 	else if (tx->state != PSBT_ST_INPUTS) {
 		psbt_errmsg = "psbt_new_input_record_set: "
-			"this can only be called after psbt_write_global_record "
-			"or after psbt_write_input_record";
+			"this can only be called after psbt_write_global_record, "
+                        "psbt_new_input_record_set, "
+			"or psbt_write_input_record";
 		return PSBT_INVALID_STATE;
 	}
 
