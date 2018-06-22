@@ -44,6 +44,9 @@ enum psbt_result
 psbt_write_input_record(struct psbt *tx, struct psbt_record *rec);
 
 enum psbt_result
+psbt_new_input_record_set(struct psbt *tx);
+
+enum psbt_result
 psbt_init(struct psbt *tx, unsigned char *dest, size_t dest_size);
 
 enum psbt_result

@@ -67,6 +67,12 @@ int main(int argc, char *argv[])
 	res = psbt_write_input_record(&psbt, &rec);
 	CHECKRES(res);
 
+	res = psbt_new_input_record_set(&psbt);
+	CHECKRES(res);
+
+	res = psbt_write_input_record(&psbt, &rec);
+	CHECKRES(res);
+
 	res = psbt_finalize(&psbt);
 	CHECKRES(res);
 
