@@ -26,7 +26,7 @@ static const unsigned char expected_psbt[] = {
 int main(int argc, char *argv[])
 {
 	struct psbt psbt;
-	char buffer[1024] = {0};
+	unsigned char buffer[1024] = {0};
 	enum psbt_result res;
 
 	struct psbt_record rec;
@@ -37,14 +37,14 @@ int main(int argc, char *argv[])
 	rec.type     = PSBT_TYPE_TRANSACTION;
 	rec.key      = NULL;
 	rec.key_size = 0;
-	rec.val      = (char*)transaction;
+	rec.val      = (unsigned char*)transaction;
 	rec.val_size = ARRAY_SIZE(transaction);
 
 	res = psbt_write_record(&psbt, &rec);
 	assert(res == PSBT_OK);
 
 	rec.type     = PSBT_TYPE_REDEEM_SCRIPT;
-	rec.key      = "hash160ofredeemscript";
+	rec.key      = (unsigned char*)"hash160ofredeemscript";
 	rec.key_size = sizeof("hash160ofredeemscript");
 	rec.val      = (unsigned char*)redeem_script_a;
 	rec.val_size = ARRAY_SIZE(redeem_script_a);
@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
 	assert(res == PSBT_OK);
 
 	rec.type     = PSBT_TYPE_REDEEM_SCRIPT;
-	rec.key      = "hash160ofredeemscript";
+	rec.key      = (unsigned char*)"hash160ofredeemscript";
 	rec.key_size = sizeof("hash160ofredeemscript");
 	rec.val      = (unsigned char*)redeem_script_b;
 	rec.val_size = ARRAY_SIZE(redeem_script_b);

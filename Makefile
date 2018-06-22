@@ -34,7 +34,7 @@ install: $(STATICLIB) $(SHLIB)
 	install psbt.h $(PREFIX)/include
 
 test: test.c $(OBJS)
-	$(CC) -ggdb -O0 test.c $(OBJS) -o $@
+	$(CC) $(CFLAGS) test.c $(OBJS) -o $@
 
 TAGS:
 	etags *.c
