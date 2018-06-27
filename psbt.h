@@ -44,7 +44,8 @@ size_t
 psbt_size(struct psbt *tx);
 
 enum psbt_result
-psbt_read(const unsigned char *src, struct psbt *dest);
+psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
+	psbt_record_cb *rec_cb, void* user_data);
 
 enum psbt_result
 psbt_write_global_record(struct psbt *tx, struct psbt_record *rec);
@@ -66,17 +67,16 @@ psbt_finalize(struct psbt *tx);
 
 #define PSBT_MAGIC 0x70736274
 
-#define PSBT_GLOBAL_TRANSACTION    0x00
-#define PSBT_GLOBAL_REDEEM_SCRIPT  0x01
-#define PSBT_GLOBAL_WITNESS_SCRIPT 0x02
-#define PSBT_GLOBAL_PUBLIC_KEY     0x03
-#define PSBT_GLOBAL_NUM_INPUTS     0x04
+#define PSBT_GLOBAL_TRANSACTION    0x01
+#define PSBT_GLOBAL_INPUT_ENTRY    0x02
+#define PSBT_GLOBAL_OUTPUT_ENTRY   0x03
 
-#define PSBT_INPUT_NON_WITNESS_UTXO 0x00
-#define PSBT_INPUT_WITNESS_UTXO     0x01
-#define PSBT_INPUT_PARTIAL_SIG      0x02
-#define PSBT_INPUT_SIGHASH_TYPE     0x03
-#define PSBT_INPUT_INDEX            0x04
+#define PSBT_INPUT_NON_WITNESS_UTXO 0x01
+#define PSBT_INPUT_WITNESS_UTXO     0x02
+#define PSBT_INPUT_PARTIAL_SIG      0x03
+#define PSBT_INPUT_SIGHASH_TYPE     0x04
+#define PSBT_INPUT_REDEEM_SCRIPT    0x05
+#define PSBT_INPUT_WITNESS_SCRIPT   0x06
 
 
 extern char *psbt_errmsg;

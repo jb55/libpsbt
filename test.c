@@ -29,7 +29,9 @@ static const unsigned char expected_psbt[] = {0x70, 0x73, 0x62, 0x74, 0xff, 0x01
 int main(int argc, char *argv[])
 {
 	struct psbt psbt;
+	struct psbt scratch;
 	unsigned char buffer[1024] = {0};
+	unsigned char input_buf[1024] = {0};
 	enum psbt_result res;
 
 	struct psbt_record rec;
@@ -41,38 +43,60 @@ int main(int argc, char *argv[])
 	assert(res == PSBT_INVALID_STATE);
 
 	rec.type     = PSBT_GLOBAL_TRANSACTION;
-	rec.key      = NULL;
-	rec.key_size = 0;
 	rec.val      = (unsigned char*)transaction;
 	rec.val_size = ARRAY_SIZE(transaction);
 
 	res = psbt_write_global_record(&psbt, &rec);
 	CHECKRES(res);
 
-	rec.type     = PSBT_GLOBAL_REDEEM_SCRIPT;
-	rec.key      = (unsigned char*)"hash160ofredeemscript";
-	rec.key_size = sizeof("hash160ofredeemscript");
+	// prepare input entry 1
+	res = psbt_init(&scratch, input_buf, 1024);
+	CHECKRES(res);
+	scratch.state = PSBT_ST_INPUTS;
+
+	rec.type     = PSBT_INPUT_REDEEM_SCRIPT;
 	rec.val      = (unsigned char*)redeem_script_a;
 	rec.val_size = ARRAY_SIZE(redeem_script_a);
 
+	res = psbt_write_input_record(&scratch, &rec);
+	CHECKRES(res);
+
+	// include input entry 1 in global record
+	rec.type = PSBT_GLOBAL_INPUT_ENTRY;
+	rec.val = scratch.data;
+	rec.val_size = scratch.write_pos - scratch.data;
+
 	res = psbt_write_global_record(&psbt, &rec);
 	CHECKRES(res);
 
-	rec.type     = PSBT_GLOBAL_REDEEM_SCRIPT;
-	rec.key      = (unsigned char*)"hash160ofredeemscript";
-	rec.key_size = sizeof("hash160ofredeemscript");
+	// prepare input entry 2
+	res = psbt_init(&scratch, input_buf, 1024);
+	CHECKRES(res);
+	scratch.state = PSBT_ST_INPUTS;
+
+	rec.type     = PSBT_INPUT_REDEEM_SCRIPT;
 	rec.val      = (unsigned char*)redeem_script_b;
 	rec.val_size = ARRAY_SIZE(redeem_script_b);
+
+	res = psbt_write_input_record(&scratch, &rec);
+	CHECKRES(res);
+
+	rec.type     = PSBT_INPUT_WITNESS_SCRIPT;
+	rec.val      = (unsigned char*)redeem_script_b;
+	rec.val_size = ARRAY_SIZE(redeem_script_b);
+
+	res = psbt_write_input_record(&scratch, &rec);
+	CHECKRES(res);
+
+	// include input entry 2 in global record
+	rec.type = PSBT_GLOBAL_INPUT_ENTRY;
+	rec.val = scratch.data;
+	rec.val_size = scratch.write_pos - scratch.data;
 
 	res = psbt_write_global_record(&psbt, &rec);
 	CHECKRES(res);
 
-	rec.type     = PSBT_GLOBAL_WITNESS_SCRIPT;
-	rec.key      = (unsigned char*)"hash160ofredeemscript";
-	rec.key_size = sizeof("hash160ofredeemscript");
-	rec.val      = (unsigned char*)redeem_script_b;
-	rec.val_size = ARRAY_SIZE(redeem_script_b);
-
+	// finalize
 	res = psbt_print(&psbt, stdout);
 	assert(res == PSBT_INVALID_STATE);
 

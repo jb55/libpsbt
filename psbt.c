@@ -6,6 +6,7 @@
 #include <endian.h>
 #include <assert.h>
 #include "compactsize.h"
+#include "uvarint.h"
 
 char *psbt_errmsg = NULL;
 
@@ -68,14 +69,14 @@ enum psbt_result
 psbt_finalize(struct psbt *tx) {
 	enum psbt_result res;
 
-	if (tx->state != PSBT_ST_INPUTS_NEW && tx->state != PSBT_ST_INPUTS) {
+	/*if (tx->state != PSBT_ST_INPUTS_NEW && tx->state != PSBT_ST_INPUTS) {
 		psbt_errmsg = "psbt_finalize: no input records found";
 		return PSBT_INVALID_STATE;
 	}
 
 	res = psbt_close_records(tx);
 	if (res != PSBT_OK)
-		return res;
+		return res;*/
 
 	tx->state = PSBT_ST_FINALIZED;
 
@@ -85,27 +86,18 @@ psbt_finalize(struct psbt *tx) {
 static enum psbt_result
 psbt_write_record(struct psbt *tx, struct psbt_record *rec) {
 	u32 size;
-	u32 key_size_with_type = rec->key_size + 1;
+	u32 type_entry = (rec->type << 3) + 2;
 
-	// write key length
-	size = compactsize_length(key_size_with_type);
+	// write type length
+	size = uvarint_length(type_entry);
 	ASSERT_SPACE(size);
-	compactsize_write((u8*)tx->write_pos, key_size_with_type);
+	uvarint_write((u8*)tx->write_pos, type_entry);
 	tx->write_pos += size;
 
-	// write type
-	ASSERT_SPACE(1);
-	*tx->write_pos++ = rec->type;
-
-	// write key
-	ASSERT_SPACE(rec->key_size);
-	memcpy(tx->write_pos, rec->key, rec->key_size);
-	tx->write_pos += rec->key_size;
-
 	// write value length
-	size = compactsize_length(rec->val_size);
+	size = uvarint_length(rec->val_size);
 	ASSERT_SPACE(size);
-	compactsize_write((u8*)tx->write_pos, rec->val_size);
+	uvarint_write((u8*)tx->write_pos, rec->val_size);
 	tx->write_pos += size;
 
 	// write value
@@ -196,7 +188,7 @@ psbt_read_record(struct psbt *tx, size_t src_size, struct psbt_record *rec)
 
 
 enum psbt_result
-psbt_read(unsigned char *src, size_t src_size, struct psbt *tx,
+psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 	  psbt_record_cb *rec_cb, void* user_data)
 {
 	struct psbt_record rec;
@@ -236,6 +228,7 @@ psbt_read(unsigned char *src, size_t src_size, struct psbt *tx,
 				return res;
 			break;
 
+		case PSBT_ST_HEADER:
 		case PSBT_ST_GLOBAL:
 		case PSBT_ST_INPUTS:
 			res = psbt_read_record(tx, src_size, &rec);
@@ -251,6 +244,8 @@ psbt_read(unsigned char *src, size_t src_size, struct psbt *tx,
 			break;
 
 		case PSBT_ST_INPUTS_NEW:
+		case PSBT_ST_FINALIZED:
+			assert(0); /* missing from original code */
 		}
 	}
 
