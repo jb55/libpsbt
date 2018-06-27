@@ -13,6 +13,7 @@ CFLAGS = -g -O2 -fpic -Wall -Werror -Wextra -std=c99 \
 
 OBJS += psbt.o
 OBJS += compactsize.o
+OBJS += uvarint.o
 
 SRCS=$(OBJS:.o=.c)
 
