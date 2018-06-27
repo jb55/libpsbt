@@ -196,7 +196,7 @@ psbt_read_record(struct psbt *tx, size_t src_size, struct psbt_record *rec)
 
 
 enum psbt_result
-psbt_read(unsigned char *src, size_t src_size, struct psbt *tx,
+psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 	  psbt_record_cb *rec_cb, void* user_data)
 {
 	struct psbt_record rec;
@@ -236,6 +236,7 @@ psbt_read(unsigned char *src, size_t src_size, struct psbt *tx,
 				return res;
 			break;
 
+		case PSBT_ST_HEADER:
 		case PSBT_ST_GLOBAL:
 		case PSBT_ST_INPUTS:
 			res = psbt_read_record(tx, src_size, &rec);
@@ -251,6 +252,8 @@ psbt_read(unsigned char *src, size_t src_size, struct psbt *tx,
 			break;
 
 		case PSBT_ST_INPUTS_NEW:
+		case PSBT_ST_FINALIZED:
+			assert(0); /* missing from original code */
 		}
 	}
 

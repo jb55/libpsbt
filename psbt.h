@@ -44,7 +44,8 @@ size_t
 psbt_size(struct psbt *tx);
 
 enum psbt_result
-psbt_read(const unsigned char *src, struct psbt *dest);
+psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
+	psbt_record_cb *rec_cb, void* user_data);
 
 enum psbt_result
 psbt_write_global_record(struct psbt *tx, struct psbt_record *rec);
