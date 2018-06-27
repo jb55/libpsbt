@@ -11,10 +11,9 @@ char *psbt_errmsg = NULL;
 
 #define ASSERT_SPACE(s) \
 	if (tx->write_pos+(s) > tx->data + tx->data_capacity) { \
-		psbt_errmsg = "psbt_write_kv: write out of bounds"; \
+		psbt_errmsg = "write out of bounds"; \
 		return PSBT_OUT_OF_BOUNDS_WRITE; \
 	}
-
 
 size_t psbt_size(struct psbt *tx) {
 	return tx->write_pos - tx->data;
@@ -22,7 +21,7 @@ size_t psbt_size(struct psbt *tx) {
 
 
 static enum psbt_result
-psbt_begin(struct psbt *tx) {
+psbt_write_header(struct psbt *tx) {
 	u32 magic = htobe32(PSBT_MAGIC);
 
 	ASSERT_SPACE(sizeof(magic));
@@ -32,6 +31,8 @@ psbt_begin(struct psbt *tx) {
 	ASSERT_SPACE(1);
 	*tx->write_pos = 0xff;
 	tx->write_pos++;
+
+	tx->state = PSBT_ST_HEADER;
 
 	return PSBT_OK;
 }
@@ -43,7 +44,7 @@ psbt_init(struct psbt *tx, unsigned char *dest, size_t dest_size) {
 	tx->data = dest;
 	tx->data_capacity = dest_size;
 	tx->state = PSBT_ST_INIT;
-	return psbt_begin(tx);
+	return PSBT_OK;
 }
 
 /* enum psbt_result */
@@ -84,13 +85,17 @@ psbt_finalize(struct psbt *tx) {
 static enum psbt_result
 psbt_write_record(struct psbt *tx, struct psbt_record *rec) {
 	u32 size;
+	u32 key_size_with_type = rec->key_size + 1;
 
 	// write key length
-	size = compactsize_length(rec->key_size);
-	assert(size == 1);
+	size = compactsize_length(key_size_with_type);
 	ASSERT_SPACE(size);
-	compactsize_write((u8*)tx->write_pos, rec->key_size);
+	compactsize_write((u8*)tx->write_pos, key_size_with_type);
 	tx->write_pos += size;
+
+	// write type
+	ASSERT_SPACE(1);
+	*tx->write_pos++ = rec->type;
 
 	// write key
 	ASSERT_SPACE(rec->key_size);
@@ -111,9 +116,155 @@ psbt_write_record(struct psbt *tx, struct psbt_record *rec) {
 	return PSBT_OK;
 }
 
+static enum psbt_result
+psbt_read_header(struct psbt *tx) {
+	ASSERT_SPACE(4);
+
+	u32 magic = be32toh(*((u32*)tx->write_pos));
+
+	tx->write_pos += 4;
+
+	if (magic != PSBT_MAGIC) {
+		psbt_errmsg = "psbt_read: invalid magic header";
+		return PSBT_READ_ERROR;
+	}
+
+	if (*tx->write_pos++ != 0xff) {
+		psbt_errmsg = "psbt_read: no 0xff found after magic";
+		return PSBT_READ_ERROR;
+	}
+
+	tx->state = PSBT_ST_GLOBAL;
+
+	return PSBT_OK;
+}
+
+
+static enum psbt_result
+psbt_read_record(struct psbt *tx, size_t src_size, struct psbt_record *rec)
+{
+	enum psbt_result res;
+	u64 size;
+	u32 size_len;
+
+	size_len = compactsize_peek_length(*tx->write_pos);
+	ASSERT_SPACE(size_len);
+	size = compactsize_read(tx->write_pos, &res);
+
+	tx->write_pos += size_len;
+
+	if (res != PSBT_OK)
+		return res;
+
+	if (tx->write_pos + size > tx->data + src_size) {
+		psbt_errmsg = "psbt_read: record key size too large";
+		return PSBT_READ_ERROR;
+	}
+
+	ASSERT_SPACE(1 + size);
+
+	rec->key_size = size;
+	rec->key = tx->write_pos + 1;
+	rec->is_global = tx->state == PSBT_ST_GLOBAL;
+
+	rec->type = *tx->write_pos;
+
+	tx->write_pos += 1 + size;
+
+	size_len = compactsize_peek_length(*tx->write_pos);
+	ASSERT_SPACE(size_len);
+	size = compactsize_read(tx->write_pos, &res);
+
+	if (res != PSBT_OK)
+		return res;
+
+	tx->write_pos += size_len;
+
+	if (tx->write_pos + size > tx->data + src_size) {
+		psbt_errmsg = "psbt_read: record value size too large";
+		return PSBT_READ_ERROR;
+	}
+
+	rec->val_size = size;
+	rec->val = tx->write_pos;
+
+	ASSERT_SPACE(size);
+	tx->write_pos += size;
+
+	return PSBT_OK;
+}
+
+
+enum psbt_result
+psbt_read(unsigned char *src, size_t src_size, struct psbt *tx,
+	  psbt_record_cb *rec_cb, void* user_data)
+{
+	struct psbt_record rec;
+	enum psbt_result res;
+	u8 *end;
+	u32 magic;
+	u64 size;
+
+	if (tx->state != PSBT_ST_INIT) {
+		psbt_errmsg = "psbt_read: psbt not initialized, use psbt_init first";
+		return PSBT_INVALID_STATE;
+	}
+
+	if (src_size > tx->data_capacity) {
+		psbt_errmsg = "psbt_read: read buffer is larger than psbt capacity";
+		return PSBT_OUT_OF_BOUNDS_WRITE;
+	}
+
+	if (src != tx->data)
+		memcpy(tx->data, src, src_size);
+
+	// parsing should try to get this to the finalized state,
+	// otherwise it's an invalid psbt
+	tx->state = PSBT_ST_INIT;
+	tx->write_pos = tx->data + src_size;
+
+	// XXX: needed so that the asserts work properly. this is probably fine...
+	tx->data_capacity = src_size;
+
+	end = tx->data + src_size;
+
+	while (tx->state != PSBT_ST_FINALIZED && tx->write_pos <= end) {
+		switch(tx->state) {
+		case PSBT_ST_INIT:
+			res = psbt_read_header(tx);
+			if (res != PSBT_OK)
+				return res;
+			break;
+
+		case PSBT_ST_GLOBAL:
+		case PSBT_ST_INPUTS:
+			res = psbt_read_record(tx, src_size, &rec);
+			if (res != PSBT_OK)
+				return res;
+			rec_cb(user_data, &rec);
+
+			if (*tx->write_pos == 0) {
+				tx->state = tx->state == PSBT_ST_GLOBAL ?
+					PSBT_ST_INPUTS : PSBT_ST_INPUTS_NEW;
+			}
+
+			break;
+
+		case PSBT_ST_INPUTS_NEW:
+		}
+	}
+
+	return PSBT_OK;
+}
+
 enum psbt_result
 psbt_write_global_record(struct psbt *tx, struct psbt_record *rec) {
 	if (tx->state == PSBT_ST_INIT) {
+		// write header if we haven't yet
+		psbt_write_header(tx);
+		tx->state = PSBT_ST_GLOBAL;
+	}
+	else if (tx->state == PSBT_ST_HEADER) {
 		tx->state = PSBT_ST_GLOBAL;
 	}
 	else if (tx->state != PSBT_ST_GLOBAL) {

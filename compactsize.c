@@ -7,6 +7,17 @@
 
 #include "compactsize.h"
 
+u32 compactsize_peek_length(u8 chsize) {
+	if (chsize < 253)
+		return sizeof(u8);
+	else if (chsize == 253)
+		return sizeof(u8) + sizeof(u16);
+	else if (chsize == 254)
+		return sizeof(u8) + sizeof(u32);
+	else
+		return sizeof(u8) + sizeof(u64);
+}
+
 u32 compactsize_length(u64 data) {
 	if (data < 253)
 		return sizeof(u8);

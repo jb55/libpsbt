@@ -1,5 +1,6 @@
 NAME ?= libpsbt
 SHLIB ?= $(NAME).so
+BIN = psbt
 STATICLIB ?= $(NAME).a
 PREFIX ?= /usr/local
 
@@ -15,12 +16,15 @@ OBJS += compactsize.o
 
 SRCS=$(OBJS:.o=.c)
 
-all: $(SHLIB) $(STATICLIB)
+all: $(SHLIB) $(STATICLIB) $(BIN)
 
 include $(OBJS:.o=.d)
 
 %.d: %.c
 	$(CC) -MM $(CFLAGS) $< > $@
+
+$(BIN): $(OBJS) cli.c
+	$(CC) $(CFLAGS) cli.c $(OBJS) -o $@
 
 $(STATICLIB): $(OBJS)
 	ar rcs $@ $(OBJS)

@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
 	res = psbt_write_input_record(&psbt, &rec);
 	assert(res == PSBT_INVALID_STATE);
 
-	rec.type     = PSBT_TYPE_TRANSACTION;
+	rec.type     = PSBT_GLOBAL_TRANSACTION;
 	rec.key      = NULL;
 	rec.key_size = 0;
 	rec.val      = (unsigned char*)transaction;
@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 	res = psbt_write_global_record(&psbt, &rec);
 	CHECKRES(res);
 
-	rec.type     = PSBT_TYPE_REDEEM_SCRIPT;
+	rec.type     = PSBT_GLOBAL_REDEEM_SCRIPT;
 	rec.key      = (unsigned char*)"hash160ofredeemscript";
 	rec.key_size = sizeof("hash160ofredeemscript");
 	rec.val      = (unsigned char*)redeem_script_a;
@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
 	res = psbt_write_global_record(&psbt, &rec);
 	CHECKRES(res);
 
-	rec.type     = PSBT_TYPE_REDEEM_SCRIPT;
+	rec.type     = PSBT_GLOBAL_REDEEM_SCRIPT;
 	rec.key      = (unsigned char*)"hash160ofredeemscript";
 	rec.key_size = sizeof("hash160ofredeemscript");
 	rec.val      = (unsigned char*)redeem_script_b;
@@ -67,14 +67,11 @@ int main(int argc, char *argv[])
 	res = psbt_write_global_record(&psbt, &rec);
 	CHECKRES(res);
 
-	res = psbt_write_input_record(&psbt, &rec);
-	CHECKRES(res);
-
-	res = psbt_new_input_record_set(&psbt);
-	CHECKRES(res);
-
-	res = psbt_write_input_record(&psbt, &rec);
-	CHECKRES(res);
+	rec.type     = PSBT_GLOBAL_WITNESS_SCRIPT;
+	rec.key      = (unsigned char*)"hash160ofredeemscript";
+	rec.key_size = sizeof("hash160ofredeemscript");
+	rec.val      = (unsigned char*)redeem_script_b;
+	rec.val_size = ARRAY_SIZE(redeem_script_b);
 
 	res = psbt_print(&psbt, stdout);
 	assert(res == PSBT_INVALID_STATE);
