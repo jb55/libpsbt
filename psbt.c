@@ -32,7 +32,7 @@ psbt_write_header(struct psbt *tx) {
 	*tx->write_pos = 0xff;
 	tx->write_pos++;
 
-	tx->state = PSBT_ST_HEADER;
+	tx->state = PSBT_ST_GLOBAL;
 
 	return PSBT_OK;
 }
@@ -139,11 +139,75 @@ psbt_read_header(struct psbt *tx) {
 	return PSBT_OK;
 }
 
+const char *
+psbt_input_type_tostr(enum psbt_input_type type) {
+	switch (type) {
+	case PSBT_IN_NON_WITNESS_UTXO:
+		return "IN_NON_WITNESS_UTXO";
+	case PSBT_IN_WITNESS_UTXO:
+		return "IN_WITNESS_UTXO";
+	case PSBT_IN_PARTIAL_SIG:
+		return "IN_PARTIAL_SIG";
+	case PSBT_IN_SIGHASH_TYPE:
+		return "IN_SIGHASH_TYPE";
+	case PSBT_IN_REDEEM_SCRIPT:
+		return "IN_REDEEM_SCRIPT";
+	case PSBT_IN_WITNESS_SCRIPT:
+		return "IN_WITNESS_SCRIPT";
+	case PSBT_IN_BIP32_DERIVATION:
+		return "IN_BIP32_DERIVATION";
+	case PSBT_IN_FINAL_SCRIPTSIG:
+		return "IN_FINAL_SCRIPTSIG";
+	case PSBT_IN_FINAL_SCRIPTWITNESS:
+		return "IN_FINAL_SCRIPTWITNESS";
+	}
+
+	return "UNKNOWN_INPUT_TYPE";
+}
+
+
+const char *
+psbt_output_type_tostr(enum psbt_output_type type) {
+	switch (type) {
+	case PSBT_OUT_REDEEM_SCRIPT:
+		return "OUT_REDEEM_SCRIPT";
+	case PSBT_OUT_WITNESS_SCRIPT:
+		return "OUT_WITNESS_SCRIPT";
+	case PSBT_OUT_BIP32_DERIVATION:
+		return "OUT_BIP32_DERIVATION";
+	}
+
+	return "UNKNOWN_OUTPUT_TYPE";
+}
+
+const char *
+psbt_global_type_tostr(enum psbt_global_type type) {
+	switch (type) {
+	case PSBT_GLOBAL_UNSIGNED_TX: return "GLOBAL_UNSIGNED_TX";
+	}
+
+	return "UNKNOWN_GLOBAL_TYPE";
+}
+
+const char *
+psbt_type_tostr(unsigned char type, enum psbt_scope scope) {
+	switch (scope) {
+	case PSBT_SCOPE_GLOBAL:
+		return psbt_global_type_tostr((enum psbt_global_type)type);
+	case PSBT_SCOPE_INPUTS:
+		return psbt_input_type_tostr((enum psbt_input_type)type);
+	case PSBT_SCOPE_OUTPUTS:
+		return psbt_output_type_tostr((enum psbt_output_type)type);
+	}
+
+	return "UNKNOWN_SCOPE";
+}
+
 
 static enum psbt_result
 psbt_read_record(struct psbt *tx, size_t src_size, struct psbt_record *rec)
 {
-	enum psbt_result res;
+	enum psbt_result res = PSBT_OK;
 	u64 size;
 	u32 size_len;
 
@@ -165,7 +229,24 @@ psbt_read_record(struct psbt *tx, size_t src_size, struct psbt_record *rec)
 
 	rec->key_size = size;
 	rec->key = tx->write_pos + 1;
-	rec->is_global = tx->state == PSBT_ST_GLOBAL;
+	switch (tx->state) {
+		case PSBT_ST_GLOBAL:
+			rec->scope = PSBT_SCOPE_GLOBAL;
+			break;
+
+		case PSBT_ST_INPUTS:
+			rec->scope = PSBT_SCOPE_INPUTS;
+			break;
+
+		case PSBT_ST_OUTPUTS:
+			rec->scope = PSBT_SCOPE_OUTPUTS;
+			break;
+
+		default:
+			psbt_errmsg = "psbt_read_record: invalid record state";
+			return PSBT_INVALID_STATE;
+	}
+	rec->scope = tx->state == PSBT_ST_GLOBAL;
 
 	rec->type = *tx->write_pos;
 
@@ -196,14 +277,12 @@ psbt_read_record(struct psbt *tx, size_t src_size, struct psbt_record *rec)
 
 
 enum psbt_result
-psbt_read(unsigned char *src, size_t src_size, struct psbt *tx,
+psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 	  psbt_record_cb *rec_cb, void* user_data)
 {
 	struct psbt_record rec;
 	enum psbt_result res;
 	u8 *end;
-	u32 magic;
-	u64 size;
 
 	if (tx->state != PSBT_ST_INIT) {
 		psbt_errmsg = "psbt_read: psbt not initialized, use psbt_init first";
@@ -221,7 +300,7 @@ psbt_read(unsigned char *src, size_t src_size, struct psbt *tx,
 	// parsing should try to get this to the finalized state,
 	// otherwise it's an invalid psbt
 	tx->state = PSBT_ST_INIT;
-	tx->write_pos = tx->data + src_size;
+	tx->write_pos = tx->data;
 
 	// XXX: needed so that the asserts work properly. this is probably fine...
 	tx->data_capacity = src_size;
@@ -238,20 +317,54 @@ psbt_read(unsigned char *src, size_t src_size, struct psbt *tx,
 
 		case PSBT_ST_GLOBAL:
 		case PSBT_ST_INPUTS:
+		case PSBT_ST_OUTPUTS:
 			res = psbt_read_record(tx, src_size, &rec);
+
 			if (res != PSBT_OK)
 				return res;
+
 			rec_cb(user_data, &rec);
 
 			if (*tx->write_pos == 0) {
-				tx->state = tx->state == PSBT_ST_GLOBAL ?
-					PSBT_ST_INPUTS : PSBT_ST_INPUTS_NEW;
-			}
+				switch (tx->state) {
+				case PSBT_ST_GLOBAL:
+					tx->state = PSBT_ST_INPUTS_NEW;
+					break;
 
+				case PSBT_ST_INPUTS:
+					tx->state = PSBT_ST_OUTPUTS_NEW;
+					break;
+
+				case PSBT_ST_OUTPUTS:
+					tx->state = PSBT_ST_FINALIZED;
+					break;
+
+				default:
+					assert(!"psbt_read: invalid state at null byte");
+				}
+			}
+			break;
+
+		case PSBT_ST_OUTPUTS_NEW:
+			assert(*tx->write_pos == 0);
+			tx->write_pos++;
+			tx->state = PSBT_ST_OUTPUTS;
 			break;
 
 		case PSBT_ST_INPUTS_NEW:
+			assert(*tx->write_pos == 0);
+			tx->write_pos++;
+			tx->state = PSBT_ST_INPUTS;
+			break;
+
+		case PSBT_ST_FINALIZED:
+			break;
 		}
+	}
+
+	if (tx->state != PSBT_ST_FINALIZED) {
+		psbt_errmsg = "psbt_read: invalid psbt";
+		return PSBT_READ_ERROR;
 	}
 
 	return PSBT_OK;
@@ -262,9 +375,6 @@ psbt_write_global_record(struct psbt *tx, struct psbt_record *rec) {
 	if (tx->state == PSBT_ST_INIT) {
 		// write header if we haven't yet
 		psbt_write_header(tx);
-		tx->state = PSBT_ST_GLOBAL;
-	}
-	else if (tx->state == PSBT_ST_HEADER) {
 		tx->state = PSBT_ST_GLOBAL;
 	}
 	else if (tx->state != PSBT_ST_GLOBAL) {
@@ -294,6 +404,30 @@ psbt_new_input_record_set(struct psbt *tx) {
 			"this can only be called after psbt_write_global_record, "
                         "psbt_new_input_record_set, "
 			"or psbt_write_input_record";
+		return PSBT_INVALID_STATE;
+	}
+
+	return psbt_close_records(tx);
+}
+
+
+enum psbt_result
+psbt_new_output_record_set(struct psbt *tx) {
+	enum psbt_result res;
+	if (tx->state == PSBT_ST_INPUTS
+	    || tx->state == PSBT_ST_INPUTS_NEW
+	    || tx->state == PSBT_ST_OUTPUTS_NEW
+	    || tx->state == PSBT_ST_OUTPUTS)
+	{
+		res = psbt_close_records(tx);
+		if (res != PSBT_OK)
+			return res;
+		tx->state = PSBT_ST_OUTPUTS_NEW;
+		return PSBT_OK;
+	}
+	else if (tx->state != PSBT_ST_OUTPUTS) {
+		psbt_errmsg = "psbt_new_output_record_set: "
+			"this can only be called after writing input records";
 		return PSBT_INVALID_STATE;
 	}
 

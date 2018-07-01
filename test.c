@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
 	res = psbt_write_global_record(&psbt, &rec);
 	CHECKRES(res);
 
-	rec.type     = PSBT_GLOBAL_REDEEM_SCRIPT;
+	rec.type     = PSBT_IN_REDEEM_SCRIPT;
 	rec.key      = (unsigned char*)"hash160ofredeemscript";
 	rec.key_size = sizeof("hash160ofredeemscript");
 	rec.val      = (unsigned char*)redeem_script_b;
@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 	res = psbt_write_global_record(&psbt, &rec);
 	CHECKRES(res);
 
-	rec.type     = PSBT_GLOBAL_WITNESS_SCRIPT;
+	rec.type     = PSBT_IN_WITNESS_SCRIPT;
 	rec.key      = (unsigned char*)"hash160ofredeemscript";
 	rec.key_size = sizeof("hash160ofredeemscript");
 	rec.val      = (unsigned char*)redeem_script_b;

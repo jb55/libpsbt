@@ -12,25 +12,37 @@ enum psbt_result {
 	PSBT_OUT_OF_BOUNDS_WRITE
 };
 
-#define PSBT_GLOBAL_UNSIGNED_TX     0
+enum psbt_global_type {
+	PSBT_GLOBAL_UNSIGNED_TX = 0
+};
 
-#define PSBT_IN_NON_WITNESS_UTXO    0
-#define PSBT_IN_WITNESS_UTXO        1
-#define PSBT_IN_PARTIAL_SIG         2
-#define PSBT_IN_SIGHASH_TYPE        3
-#define PSBT_IN_REDEEM_SCRIPT       4
-#define PSBT_IN_WITNESS_SCRIPT      5
-#define PSBT_IN_BIP32_DERIVATION    6
-#define PSBT_IN_FINAL_SCRIPTSIG     7
-#define PSBT_IN_FINAL_SCRIPTWITNESS 8
+enum psbt_input_type {
+	PSBT_IN_NON_WITNESS_UTXO    = 0,
+	PSBT_IN_WITNESS_UTXO        = 1,
+	PSBT_IN_PARTIAL_SIG         = 2,
+	PSBT_IN_SIGHASH_TYPE        = 3,
+	PSBT_IN_REDEEM_SCRIPT       = 4,
+	PSBT_IN_WITNESS_SCRIPT      = 5,
+	PSBT_IN_BIP32_DERIVATION    = 6,
+	PSBT_IN_FINAL_SCRIPTSIG     = 7,
+	PSBT_IN_FINAL_SCRIPTWITNESS = 8,
+};
 
-#define PSBT_OUT_REDEEM_SCRIPT      0
-#define PSBT_OUT_WITNESS_SCRIPT     1
-#define PSBT_OUT_BIP32_DERIVATION   2
+
+enum psbt_output_type {
+	PSBT_OUT_REDEEM_SCRIPT      = 0,
+	PSBT_OUT_WITNESS_SCRIPT     = 1,
+	PSBT_OUT_BIP32_DERIVATION   = 2,
+};
+
+enum psbt_scope {
+	PSBT_SCOPE_GLOBAL,
+	PSBT_SCOPE_INPUTS,
+	PSBT_SCOPE_OUTPUTS,
+};
 
 enum psbt_state {
 	PSBT_ST_INIT = 2,
-	PSBT_ST_HEADER,
 	PSBT_ST_GLOBAL,
 	PSBT_ST_INPUTS,
 	PSBT_ST_INPUTS_NEW,
@@ -52,7 +64,7 @@ struct psbt_record {
 	unsigned int key_size;
 	unsigned char *val;
 	unsigned int val_size;
-	int is_global; // only needed when reading to signify a global record
+	enum psbt_scope scope;
 };
 
 typedef void (psbt_record_cb)(void *user_data, struct psbt_record *rec);
@@ -61,7 +73,20 @@ size_t
 psbt_size(struct psbt *tx);
 
 enum psbt_result
-psbt_read(const unsigned char *src, struct psbt *dest);
+psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
+	  psbt_record_cb *rec_cb, void* user_data);
+
+const char *
+psbt_type_tostr(unsigned char type, enum psbt_scope scope);
+
+const char *
+psbt_global_type_tostr(enum psbt_global_type type);
+
+const char *
+psbt_output_type_tostr(enum psbt_output_type type);
+
+const char *
+psbt_input_type_tostr(enum psbt_input_type type);
 
 enum psbt_result
 psbt_write_global_record(struct psbt *tx, struct psbt_record *rec);
@@ -71,6 +96,9 @@ psbt_write_input_record(struct psbt *tx, struct psbt_record *rec);
 
 enum psbt_result
 psbt_new_input_record_set(struct psbt *tx);
+
+enum psbt_result
+psbt_new_output_record_set(struct psbt *tx);
 
 enum psbt_result
 psbt_init(struct psbt *tx, unsigned char *dest, size_t dest_size);
