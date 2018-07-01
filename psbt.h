@@ -1,4 +1,3 @@
-
 #ifndef PSBT_H
 #define PSBT_H
 
@@ -13,12 +12,30 @@ enum psbt_result {
 	PSBT_OUT_OF_BOUNDS_WRITE
 };
 
+#define PSBT_GLOBAL_UNSIGNED_TX     0
+
+#define PSBT_IN_NON_WITNESS_UTXO    0
+#define PSBT_IN_WITNESS_UTXO        1
+#define PSBT_IN_PARTIAL_SIG         2
+#define PSBT_IN_SIGHASH_TYPE        3
+#define PSBT_IN_REDEEM_SCRIPT       4
+#define PSBT_IN_WITNESS_SCRIPT      5
+#define PSBT_IN_BIP32_DERIVATION    6
+#define PSBT_IN_FINAL_SCRIPTSIG     7
+#define PSBT_IN_FINAL_SCRIPTWITNESS 8
+
+#define PSBT_OUT_REDEEM_SCRIPT      0
+#define PSBT_OUT_WITNESS_SCRIPT     1
+#define PSBT_OUT_BIP32_DERIVATION   2
+
 enum psbt_state {
 	PSBT_ST_INIT = 2,
 	PSBT_ST_HEADER,
 	PSBT_ST_GLOBAL,
 	PSBT_ST_INPUTS,
 	PSBT_ST_INPUTS_NEW,
+	PSBT_ST_OUTPUTS,
+	PSBT_ST_OUTPUTS_NEW,
 	PSBT_ST_FINALIZED,
 };
 
@@ -66,20 +83,7 @@ psbt_finalize(struct psbt *tx);
 
 #define PSBT_MAGIC 0x70736274
 
-#define PSBT_GLOBAL_TRANSACTION    0x00
-#define PSBT_GLOBAL_REDEEM_SCRIPT  0x01
-#define PSBT_GLOBAL_WITNESS_SCRIPT 0x02
-#define PSBT_GLOBAL_PUBLIC_KEY     0x03
-#define PSBT_GLOBAL_NUM_INPUTS     0x04
-
-#define PSBT_INPUT_NON_WITNESS_UTXO 0x00
-#define PSBT_INPUT_WITNESS_UTXO     0x01
-#define PSBT_INPUT_PARTIAL_SIG      0x02
-#define PSBT_INPUT_SIGHASH_TYPE     0x03
-#define PSBT_INPUT_INDEX            0x04
-
 
 extern char *psbt_errmsg;
 
 #endif /* PSBT_H */
-
