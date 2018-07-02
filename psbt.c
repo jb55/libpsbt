@@ -587,6 +587,9 @@ psbt_encode(unsigned char *psbt, size_t psbt_size, enum psbt_encoding encoding,
 	case PSBT_ENCODING_PROTOBUF:
 		return protobuf_encode(psbt, psbt_size, dest, dest_size);
 	}
+
+	psbt_errmsg = "psbt_encode: invalid encoding enum value";
+	return PSBT_NOT_IMPLEMENTED;
 }
 
 const char *
