@@ -559,3 +559,37 @@ psbt_decode(const char *src, size_t src_size, unsigned char *dest,
 
 	return psbt_hex_decode(src, src_size, dest, dest_size);
 }
+
+
+static enum psbt_result
+hex_encode(u8 *psbt, size_t psbt_size, u8 *dest, size_t dest_size) {
+	return PSBT_NOT_IMPLEMENTED;
+}
+
+static enum psbt_result
+base64_encode(u8 *psbt, size_t psbt_size, u8 *dest, size_t dest_size) {
+	return PSBT_NOT_IMPLEMENTED;
+}
+
+static enum psbt_result
+protobuf_encode(u8 *psbt, size_t psbt_size, u8 *dest, size_t dest_size) {
+	return PSBT_NOT_IMPLEMENTED;
+}
+
+enum psbt_result
+psbt_encode(unsigned char *psbt, size_t psbt_size, enum psbt_encoding encoding,
+	    unsigned char *dest, size_t dest_size) {
+	switch (encoding) {
+	case PSBT_ENCODING_HEX:
+		return hex_encode(psbt, psbt_size, dest, dest_size);
+	case PSBT_ENCODING_BASE64:
+		return base64_encode(psbt, psbt_size, dest, dest_size);
+	case PSBT_ENCODING_PROTOBUF:
+		return protobuf_encode(psbt, psbt_size, dest, dest_size);
+	}
+}
+
+const char *
+psbt_geterr() {
+	return psbt_errmsg;
+}

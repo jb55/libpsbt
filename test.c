@@ -26,8 +26,7 @@ static const unsigned char expected_psbt[] = {0x70, 0x73, 0x62, 0x74, 0xff, 0x01
 	   exit(1); \
 	}
 
-int main(int argc, char *argv[])
-{
+void test_vector() {
 	struct psbt psbt;
 	unsigned char buffer[1024] = {0};
 	enum psbt_result res;
@@ -78,7 +77,15 @@ int main(int argc, char *argv[])
 
 	res = psbt_print(&psbt, stdout);
 	CHECKRES(res);
+}
 
+void encode_decode_test() {
 
+}
+
+int main(int argc, char *argv[])
+{
+	test_vector();
 	return 0;
 }
+
