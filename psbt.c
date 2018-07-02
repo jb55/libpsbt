@@ -10,9 +10,12 @@
 
 char *psbt_errmsg = NULL;
 
+#define STRINGIZE_DETAIL(x) #x
+#define STRINGIZE(x) STRINGIZE_DETAIL(x)
+
 #define ASSERT_SPACE(s) \
 	if (tx->write_pos+(s) > tx->data + tx->data_capacity) { \
-		psbt_errmsg = "write out of bounds"; \
+		psbt_errmsg = "write out of bounds " __FILE__ ":" STRINGIZE(__LINE__); \
 		return PSBT_OOB_WRITE; \
 	}
 
@@ -236,6 +239,7 @@ psbt_read_record(struct psbt *tx, size_t src_size, struct psbt_record *rec)
 	size_len = compactsize_peek_length(*tx->write_pos);
 	ASSERT_SPACE(size_len);
 	size = compactsize_read(tx->write_pos, &res);
+	assert(size > 0);
 
 	tx->write_pos += size_len;
 
@@ -247,10 +251,10 @@ psbt_read_record(struct psbt *tx, size_t src_size, struct psbt_record *rec)
 		return PSBT_READ_ERROR;
 	}
 
-	ASSERT_SPACE(1 + size);
+	ASSERT_SPACE(size);
 
 	rec->key_size = size;
-	rec->key = tx->write_pos + 1;
+	rec->key = tx->write_pos;
 	switch (tx->state) {
 		case PSBT_ST_GLOBAL:
 			rec->scope = PSBT_SCOPE_GLOBAL;
@@ -329,7 +333,6 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 	end = tx->data + src_size;
 
 	while (tx->state != PSBT_ST_FINALIZED && tx->write_pos <= end) {
-		printf("state: %s\n", psbt_state_tostr(tx->state));
 		switch(tx->state) {
 		case PSBT_ST_INIT:
 			res = psbt_read_header(tx);
@@ -340,12 +343,6 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 		case PSBT_ST_GLOBAL:
 		case PSBT_ST_INPUTS:
 		case PSBT_ST_OUTPUTS:
-			res = psbt_read_record(tx, src_size, &rec);
-
-			if (res != PSBT_OK)
-				return res;
-
-			rec_cb(user_data, &rec);
 
 			if (*tx->write_pos == 0) {
 				switch (tx->state) {
@@ -365,6 +362,16 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 					assert(!"psbt_read: invalid state at null byte");
 				}
 			}
+			else {
+				res = psbt_read_record(tx, src_size, &rec);
+
+				if (res != PSBT_OK)
+					return res;
+
+				rec_cb(user_data, &rec);
+			}
+
+
 			break;
 
 		case PSBT_ST_OUTPUTS_NEW:
