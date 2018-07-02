@@ -165,6 +165,27 @@ psbt_input_type_tostr(enum psbt_input_type type) {
 	return "UNKNOWN_INPUT_TYPE";
 }
 
+const char *
+psbt_state_tostr(enum psbt_state state) {
+	switch (state) {
+	case PSBT_ST_INIT:
+		return "INIT";
+	case PSBT_ST_GLOBAL:
+		return "GLOBAL";
+	case PSBT_ST_INPUTS:
+		return "INPUTS";
+	case PSBT_ST_INPUTS_NEW:
+		return "INPUTS_NEW";
+	case PSBT_ST_OUTPUTS:
+		return "OUTPUTS";
+	case PSBT_ST_OUTPUTS_NEW:
+		return "OUTPUTS_NEW";
+	case PSBT_ST_FINALIZED:
+		return "FINALIZED";
+	}
+
+	return "UNKNOWN_STATE";
+}
 
 const char *
 psbt_output_type_tostr(enum psbt_output_type type) {
@@ -246,11 +267,10 @@ psbt_read_record(struct psbt *tx, size_t src_size, struct psbt_record *rec)
 			psbt_errmsg = "psbt_read_record: invalid record state";
 			return PSBT_INVALID_STATE;
 	}
-	rec->scope = tx->state == PSBT_ST_GLOBAL;
 
 	rec->type = *tx->write_pos;
 
-	tx->write_pos += 1 + size;
+	tx->write_pos += size;
 
 	size_len = compactsize_peek_length(*tx->write_pos);
 	ASSERT_SPACE(size_len);
