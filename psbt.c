@@ -517,23 +517,19 @@ static inline u8 hexdigit( char hex ) {
 }
 
 enum psbt_result
-psbt_decode(const char *src, size_t src_size, unsigned char *dest,
-	    size_t dest_size)
-{
+psbt_hex_decode(const char *src, size_t src_size, unsigned char *dest,
+	        size_t dest_size) {
+
 	enum psbt_result res = PSBT_OK;
 
-	// TODO: detect base64 or hex encoding
-	// default is hex encoding for now
-
-	// TODO: update for base64 detection/size calc
 	if (src_size % 2 != 0) {
 		psbt_errmsg = "psbt_decode: invalid hex string";
 		return PSBT_READ_ERROR;
 	}
 
 	if (dest_size < src_size / 2) {
-		psbt_errmsg = "psbt_decode: dest_size must be half the size of "
-			"src_size";
+		psbt_errmsg = "psbt_decode: dest_size must be at least half the"
+			" size of src_size";
 		return PSBT_READ_ERROR;
 	}
 
@@ -544,7 +540,7 @@ psbt_decode(const char *src, size_t src_size, unsigned char *dest,
 		u8 c1 = src[i];
 		u8 c2 = src[i+1];
 		if (!isxdigit(c1) || !isxdigit(c2)) {
-			psbt_errmsg = "psbt_decode: input is not a hex string";
+			psbt_errmsg = "psbt_decode: invalid hex string";
 			return PSBT_READ_ERROR;
 		}
 
@@ -552,4 +548,14 @@ psbt_decode(const char *src, size_t src_size, unsigned char *dest,
 	}
 
 	return PSBT_OK;
+}
+
+enum psbt_result
+psbt_decode(const char *src, size_t src_size, unsigned char *dest,
+	    size_t dest_size) {
+
+	// TODO: detect base64 or hex encoding
+	// default is hex encoding for now
+
+	return psbt_hex_decode(src, src_size, dest, dest_size);
 }
