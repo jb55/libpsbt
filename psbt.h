@@ -9,7 +9,7 @@ enum psbt_result {
 	PSBT_COMPACT_READ_ERROR,
 	PSBT_READ_ERROR,
 	PSBT_INVALID_STATE,
-	PSBT_OUT_OF_BOUNDS_WRITE
+	PSBT_OOB_WRITE
 };
 
 enum psbt_global_type {
@@ -73,8 +73,14 @@ size_t
 psbt_size(struct psbt *tx);
 
 enum psbt_result
-psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
+psbt_read(const unsigned char *src, size_t src_size, struct psbt *psbt,
 	  psbt_record_cb *rec_cb, void* user_data);
+
+enum psbt_result
+psbt_decode(const char *src, size_t src_size, unsigned char *dest, size_t dest_size);
+
+const char *
+psbt_state_tostr(enum psbt_state state);
 
 const char *
 psbt_type_tostr(unsigned char type, enum psbt_scope scope);
@@ -93,6 +99,9 @@ psbt_write_global_record(struct psbt *tx, struct psbt_record *rec);
 
 enum psbt_result
 psbt_write_input_record(struct psbt *tx, struct psbt_record *rec);
+
+enum psbt_result
+psbt_write_output_record(struct psbt *tx, struct psbt_record *rec);
 
 enum psbt_result
 psbt_new_input_record_set(struct psbt *tx);

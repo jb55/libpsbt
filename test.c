@@ -50,28 +50,25 @@ int main(int argc, char *argv[])
 	CHECKRES(res);
 
 	rec.type     = PSBT_IN_REDEEM_SCRIPT;
-	rec.key      = (unsigned char*)"hash160ofredeemscript";
-	rec.key_size = sizeof("hash160ofredeemscript");
+	rec.key_size = 0;
 	rec.val      = (unsigned char*)redeem_script_a;
 	rec.val_size = ARRAY_SIZE(redeem_script_a);
 
-	res = psbt_write_global_record(&psbt, &rec);
+	res = psbt_write_input_record(&psbt, &rec);
 	CHECKRES(res);
 
 	rec.type     = PSBT_IN_REDEEM_SCRIPT;
-	rec.key      = (unsigned char*)"hash160ofredeemscript";
-	rec.key_size = sizeof("hash160ofredeemscript");
+	rec.key_size = 0;
 	rec.val      = (unsigned char*)redeem_script_b;
 	rec.val_size = ARRAY_SIZE(redeem_script_b);
 
-	res = psbt_write_global_record(&psbt, &rec);
+	res = psbt_write_input_record(&psbt, &rec);
 	CHECKRES(res);
 
-	rec.type     = PSBT_IN_WITNESS_SCRIPT;
-	rec.key      = (unsigned char*)"hash160ofredeemscript";
-	rec.key_size = sizeof("hash160ofredeemscript");
-	rec.val      = (unsigned char*)redeem_script_b;
-	rec.val_size = ARRAY_SIZE(redeem_script_b);
+	res = psbt_new_output_record_set(&psbt);
+	CHECKRES(res);
+
+	printf("state %s\n", psbt_state_tostr(psbt.state));
 
 	res = psbt_print(&psbt, stdout);
 	assert(res == PSBT_INVALID_STATE);

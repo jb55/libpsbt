@@ -2,6 +2,7 @@
 #define _DEFAULT_SOURCE
 
 #include <stdio.h>
+#include <ctype.h>
 #include <string.h>
 #include <endian.h>
 #include <assert.h>
@@ -12,7 +13,7 @@ char *psbt_errmsg = NULL;
 #define ASSERT_SPACE(s) \
 	if (tx->write_pos+(s) > tx->data + tx->data_capacity) { \
 		psbt_errmsg = "write out of bounds"; \
-		return PSBT_OUT_OF_BOUNDS_WRITE; \
+		return PSBT_OOB_WRITE; \
 	}
 
 size_t psbt_size(struct psbt *tx) {
@@ -68,8 +69,8 @@ enum psbt_result
 psbt_finalize(struct psbt *tx) {
 	enum psbt_result res;
 
-	if (tx->state != PSBT_ST_INPUTS_NEW && tx->state != PSBT_ST_INPUTS) {
-		psbt_errmsg = "psbt_finalize: no input records found";
+	if (tx->state != PSBT_ST_OUTPUTS_NEW && tx->state != PSBT_ST_OUTPUTS) {
+		psbt_errmsg = "psbt_finalize: no output records found";
 		return PSBT_INVALID_STATE;
 	}
 
@@ -311,7 +312,7 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 
 	if (src_size > tx->data_capacity) {
 		psbt_errmsg = "psbt_read: read buffer is larger than psbt capacity";
-		return PSBT_OUT_OF_BOUNDS_WRITE;
+		return PSBT_OOB_WRITE;
 	}
 
 	if (src != tx->data)
@@ -328,6 +329,7 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 	end = tx->data + src_size;
 
 	while (tx->state != PSBT_ST_FINALIZED && tx->write_pos <= end) {
+		printf("state: %s\n", psbt_state_tostr(tx->state));
 		switch(tx->state) {
 		case PSBT_ST_INIT:
 			res = psbt_read_header(tx);
@@ -489,3 +491,65 @@ psbt_write_input_record(struct psbt *tx, struct psbt_record *rec) {
 	return psbt_write_record(tx, rec);
 }
 
+
+enum psbt_result
+psbt_write_output_record(struct psbt *tx, struct psbt_record *rec) {
+	enum psbt_result res;
+	if (tx->state == PSBT_ST_INPUTS) {
+		// close global records
+		if ((res = psbt_close_records(tx)) != PSBT_OK)
+			return res;
+		tx->state = PSBT_ST_OUTPUTS;
+	}
+	else if (tx->state != PSBT_ST_OUTPUTS && tx->state != PSBT_ST_OUTPUTS_NEW) {
+		psbt_errmsg = "psbt_write_input_record: attempting to write an "
+			"input record before any global records have been written."
+			" use psbt_write_global_record first";
+		return PSBT_INVALID_STATE;
+	}
+
+	return psbt_write_record(tx, rec);
+}
+
+
+static inline u8 hexdigit( char hex ) {
+	return (hex <= '9') ? hex - '0' : toupper(hex) - 'A' + 10 ;
+}
+
+enum psbt_result
+psbt_decode(const char *src, size_t src_size, unsigned char *dest,
+	    size_t dest_size)
+{
+	enum psbt_result res = PSBT_OK;
+
+	// TODO: detect base64 or hex encoding
+	// default is hex encoding for now
+
+	// TODO: update for base64 detection/size calc
+	if (src_size % 2 != 0) {
+		psbt_errmsg = "psbt_decode: invalid hex string";
+		return PSBT_READ_ERROR;
+	}
+
+	if (dest_size < src_size / 2) {
+		psbt_errmsg = "psbt_decode: dest_size must be half the size of "
+			"src_size";
+		return PSBT_READ_ERROR;
+	}
+
+	if (res != PSBT_OK)
+		return res;
+
+	for (size_t i = 0; i < src_size; i += 2) {
+		u8 c1 = src[i];
+		u8 c2 = src[i+1];
+		if (!isxdigit(c1) || !isxdigit(c2)) {
+			psbt_errmsg = "psbt_decode: input is not a hex string";
+			return PSBT_READ_ERROR;
+		}
+
+		dest[i/2] = hexdigit(c1) << 4 | hexdigit(c2);
+	}
+
+	return PSBT_OK;
+}
