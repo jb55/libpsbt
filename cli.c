@@ -27,10 +27,12 @@ int main(int argc, char *argv[])
 	struct psbt tx;
 	static unsigned char buffer[2048];
 	enum psbt_result res;
+	size_t psbt_len = strlen(psbt_example);
 
 	psbt_init(&tx, buffer, 2048);
 
-	res = psbt_decode(psbt_example, strlen(psbt_example), &tx, print_rec, NULL);
+	psbt_decode(psbt_example, psbt_len, buffer, 2048);
+	res = psbt_read(buffer, psbt_len / 2, &tx, print_rec, NULL);
 
 	if (res != PSBT_OK) {
 		printf("error (%d): %s\n", res, psbt_errmsg);
