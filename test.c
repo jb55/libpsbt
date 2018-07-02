@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
 	res = psbt_write_input_record(&psbt, &rec);
 	assert(res == PSBT_INVALID_STATE);
 
-	rec.type     = PSBT_GLOBAL_TRANSACTION;
+	rec.type     = PSBT_GLOBAL_UNSIGNED_TX;
 	rec.key      = NULL;
 	rec.key_size = 0;
 	rec.val      = (unsigned char*)transaction;
@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 	res = psbt_write_global_record(&psbt, &rec);
 	CHECKRES(res);
 
-	rec.type     = PSBT_GLOBAL_REDEEM_SCRIPT;
+	rec.type     = PSBT_IN_REDEEM_SCRIPT;
 	rec.key      = (unsigned char*)"hash160ofredeemscript";
 	rec.key_size = sizeof("hash160ofredeemscript");
 	rec.val      = (unsigned char*)redeem_script_a;
