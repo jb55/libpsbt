@@ -6,7 +6,8 @@
 ## Progress
 
 - [x] Serialization
-- [ ] Deserialization
+- [x] Deserialization
+- [ ] Validation
 - [ ] Merging
 
 ## Installation
