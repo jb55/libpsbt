@@ -8,6 +8,7 @@ enum psbt_result {
 	PSBT_OK,
 	PSBT_COMPACT_READ_ERROR,
 	PSBT_READ_ERROR,
+	PSBT_WRITE_ERROR,
 	PSBT_INVALID_STATE,
 	PSBT_NOT_IMPLEMENTED,
 	PSBT_OOB_WRITE
@@ -20,6 +21,7 @@ enum psbt_global_type {
 enum psbt_encoding {
 	PSBT_ENCODING_HEX,
 	PSBT_ENCODING_BASE64,
+	PSBT_ENCODING_BASE62,
 	PSBT_ENCODING_PROTOBUF,
 };
 
@@ -84,11 +86,17 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *psbt,
 	  psbt_record_cb *rec_cb, void* user_data);
 
 enum psbt_result
-psbt_decode(const char *src, size_t src_size, unsigned char *dest, size_t dest_size);
+psbt_decode(const char *src, size_t src_size, unsigned char *dest,
+	    size_t dest_size, size_t *psbt_len);
 
 enum psbt_result
-psbt_encode(unsigned char *psbt, size_t psbt_size, enum psbt_encoding encoding,
-	    unsigned char *dest, size_t dest_size);
+psbt_encode(struct psbt *psbt, enum psbt_encoding encoding, unsigned char *dest,
+	    size_t dest_size, size_t *out_len);
+
+enum psbt_result
+psbt_encode_raw(unsigned char *psbt_data, size_t psbt_len,
+		enum psbt_encoding encoding, unsigned char *dest,
+		size_t dest_size, size_t* out_len);
 
 const char *
 psbt_geterr();

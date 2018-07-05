@@ -7,6 +7,7 @@
 #include <endian.h>
 #include <assert.h>
 #include "compactsize.h"
+#include "base64.h"
 
 char *psbt_errmsg = NULL;
 
@@ -253,8 +254,11 @@ psbt_read_record(struct psbt *tx, size_t src_size, struct psbt_record *rec)
 
 	ASSERT_SPACE(size);
 
-	rec->key_size = size;
-	rec->key = tx->write_pos;
+	rec->key_size = size - 1; // don't include type in key size
+	rec->type = *tx->write_pos;
+	rec->key = tx->write_pos + 1;
+	tx->write_pos += size;
+
 	switch (tx->state) {
 		case PSBT_ST_GLOBAL:
 			rec->scope = PSBT_SCOPE_GLOBAL;
@@ -272,10 +276,6 @@ psbt_read_record(struct psbt *tx, size_t src_size, struct psbt_record *rec)
 			psbt_errmsg = "psbt_read_record: invalid record state";
 			return PSBT_INVALID_STATE;
 	}
-
-	rec->type = *tx->write_pos;
-
-	tx->write_pos += size;
 
 	size_len = compactsize_peek_length(*tx->write_pos);
 	ASSERT_SPACE(size_len);
@@ -368,7 +368,8 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 				if (res != PSBT_OK)
 					return res;
 
-				rec_cb(user_data, &rec);
+				if (rec_cb)
+					rec_cb(user_data, &rec);
 			}
 
 
@@ -551,7 +552,7 @@ psbt_hex_decode(const char *src, size_t src_size, unsigned char *dest,
 			return PSBT_READ_ERROR;
 		}
 
-		dest[i/2] = hexdigit(c1) << 4 | hexdigit(c2);
+		*dest++ = hexdigit(c1) << 4 | hexdigit(c2);
 	}
 
 	return PSBT_OK;
@@ -559,24 +560,50 @@ psbt_hex_decode(const char *src, size_t src_size, unsigned char *dest,
 
 enum psbt_result
 psbt_decode(const char *src, size_t src_size, unsigned char *dest,
-	    size_t dest_size) {
-
+	    size_t dest_size, size_t *psbt_size) {
+	enum psbt_result res;
 	// TODO: detect base64 or hex encoding
 	// default is hex encoding for now
 
+	size_t b64_magic_size = sizeof("cHNid") - 1;
+
+	// simple sanity check before we look for base64 encoding
+	if (src_size < b64_magic_size) {
+		psbt_errmsg = "psbt_decode: psbt too small";
+		return PSBT_READ_ERROR;
+	}
+
+	if (memcmp(src, "cHNid", b64_magic_size) == 0) {
+		u8 *c = base64_decode((unsigned char*)src, src_size, dest,
+					dest_size, psbt_size);
+		return c == NULL ? PSBT_READ_ERROR : PSBT_OK;
+	}
+
+	*psbt_size = src_size / 2;
 	return psbt_hex_decode(src, src_size, dest, dest_size);
 }
 
-
 static enum psbt_result
-hex_encode(u8 *psbt, size_t psbt_size, u8 *dest, size_t dest_size) {
-	return PSBT_NOT_IMPLEMENTED;
+hex_encode(u8 *buf, size_t bufsize, u8 *dest, size_t dest_size) {
+	size_t i;
+
+	if (dest_size < bufsize * 2 + 1)
+		return PSBT_OOB_WRITE;
+
+	for (i = 0; i < bufsize; i++) {
+		unsigned int c = buf[i];
+		*(dest++) = hexdigit(c >> 4);
+		*(dest++) = hexdigit(c & 0xF);
+	}
+	*dest = '\0';
+
+	return PSBT_OK;
 }
 
-static enum psbt_result
-base64_encode(u8 *psbt, size_t psbt_size, u8 *dest, size_t dest_size) {
-	return PSBT_NOT_IMPLEMENTED;
-}
+/* static enum psbt_result */
+/* base64_encode(u8 *psbt, size_t psbt_size, u8 *dest, size_t dest_size) { */
+/* 	return PSBT_NOT_IMPLEMENTED; */
+/* } */
 
 static enum psbt_result
 protobuf_encode(u8 *psbt, size_t psbt_size, u8 *dest, size_t dest_size) {
@@ -584,20 +611,56 @@ protobuf_encode(u8 *psbt, size_t psbt_size, u8 *dest, size_t dest_size) {
 }
 
 enum psbt_result
-psbt_encode(unsigned char *psbt, size_t psbt_size, enum psbt_encoding encoding,
-	    unsigned char *dest, size_t dest_size) {
+psbt_encode_raw(unsigned char *psbt_data, size_t psbt_len,
+		enum psbt_encoding encoding, unsigned char *dest,
+		size_t dest_size, size_t* out_len)
+{
+	u8 *c;
+	enum psbt_result res;
+
 	switch (encoding) {
 	case PSBT_ENCODING_HEX:
-		return hex_encode(psbt, psbt_size, dest, dest_size);
+		res = hex_encode(psbt_data, psbt_len, dest, dest_size);
+		*out_len = psbt_len * 2;
+		return res;
 	case PSBT_ENCODING_BASE64:
-		return base64_encode(psbt, psbt_size, dest, dest_size);
+		c = base64_encode(psbt_data, psbt_len, dest, dest_size, out_len);
+		if (c == NULL) {
+			psbt_errmsg = "psbt_encode: base64 encode failure";
+			return PSBT_WRITE_ERROR;
+		}
+		return PSBT_OK;
+	case PSBT_ENCODING_BASE62:
+		c = base62_encode(psbt_data, psbt_len, dest, dest_size, out_len);
+		if (c == NULL) {
+			psbt_errmsg = "psbt_encode: base62 encode failure";
+			return PSBT_WRITE_ERROR;
+		}
+		return PSBT_OK;
 	case PSBT_ENCODING_PROTOBUF:
-		return protobuf_encode(psbt, psbt_size, dest, dest_size);
+		return protobuf_encode(psbt_data, psbt_len, dest, dest_size);
 	}
 
 	psbt_errmsg = "psbt_encode: invalid psbt_encoding enum value";
 	return PSBT_NOT_IMPLEMENTED;
 }
+
+enum psbt_result
+psbt_encode(struct psbt *psbt, enum psbt_encoding encoding, unsigned char *dest,
+	    size_t dest_size, size_t *out_len)
+{
+	if (psbt->state != PSBT_ST_FINALIZED) {
+		psbt_errmsg = "psbt_encode: psbt not in finalized state. "
+			"use psbt_read to parse an existing psbt, or the "
+			"psbt_write functions to create one.";
+
+		return PSBT_WRITE_ERROR;
+	}
+
+	return psbt_encode_raw(psbt->data, psbt_size(psbt), encoding, dest,
+			       dest_size, out_len);
+}
+
 
 const char *
 psbt_geterr() {

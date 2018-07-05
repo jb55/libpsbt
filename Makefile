@@ -12,6 +12,7 @@ CFLAGS = -g -O2 -fpic -Wall -Werror -Wextra -std=c99 \
 						-Wno-padded
 
 OBJS += psbt.o
+OBJS += base64.o
 OBJS += compactsize.o
 
 SRCS=$(OBJS:.o=.c)
@@ -36,6 +37,9 @@ install: $(STATICLIB) $(SHLIB)
 	install -d $(PREFIX)/lib $(PREFIX)/include
 	install $(STATICLIB) $(SHLIB) $(PREFIX)/lib
 	install psbt.h $(PREFIX)/include
+
+check: test
+	@./test
 
 test: test.c $(OBJS)
 	$(CC) $(CFLAGS) test.c $(OBJS) -o $@

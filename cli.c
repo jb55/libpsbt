@@ -15,10 +15,21 @@ void print_json_rec(void *user_data, struct psbt_record *rec) {
 		printf("\"type\": \"%s\"", psbt_type_tostr(rec->type, rec->scope));
 }
 
+static void hex_print(unsigned char *data, size_t len) {
+	for (size_t i = 0; i < len; ++i)
+		printf("%02x", data[i]);
+}
+
 void print_rec(void *user_data, struct psbt_record *rec) {
 	(void)user_data;
 	const char *type_str = psbt_type_tostr(rec->type, rec->scope);
-	printf("%s (%d)\n", type_str, rec->type);
+	printf("%s (%d)\n\t", type_str, rec->type);
+	if (rec->key_size != 0) {
+		hex_print(rec->key, rec->key_size);
+		printf(": ");
+	}
+	hex_print(rec->val, rec->val_size);
+	printf("\n");
 
 }
 
@@ -27,27 +38,43 @@ int usage() {
 	return 1;
 }
 
+#define CHECK(res) \
+	if ((res) != PSBT_OK) {					\
+		printf("error (%d): %s\n", res, psbt_errmsg);	\
+		return 1;					\
+	}
+
+
 int main(int argc, char *argv[])
 {
-	struct psbt tx;
-	static unsigned char buffer[2048];
+	struct psbt psbt;
+	static unsigned char buffer[4096];
 	enum psbt_result res;
+	size_t psbt_len;
+	size_t out_len;
 
 	if (argc < 2)
 		return usage();
 
 	size_t psbt_hex_len = strlen(argv[1]);
 
-	psbt_init(&tx, buffer, 2048);
+	psbt_init(&psbt, buffer, 4096);
 
-	res = psbt_decode(argv[1], psbt_hex_len, buffer, 2048);
+	res = psbt_decode(argv[1], psbt_hex_len, buffer, 4096, &psbt_len);
+	CHECK(res);
+
+	res = psbt_read(buffer, psbt_len, &psbt, print_rec, NULL);
+	CHECK(res);
+
+	res = psbt_encode(&psbt, PSBT_ENCODING_HEX, buffer, 4096, &out_len);
+	CHECK(res);
 
 	if (res != PSBT_OK) {
 		printf("error (%d): %s\n", res, psbt_errmsg);
 		return 1;
 	}
 
-	res = psbt_read(buffer, psbt_hex_len / 2, &tx, print_rec, NULL);
+	/* printf("%.*s\n", (int)out_len, (char*)buffer); */
 
 	if (res != PSBT_OK) {
 		printf("error (%d): %s\n", res, psbt_errmsg);
