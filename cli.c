@@ -33,10 +33,10 @@ void print_rec(struct psbt_elem *elem) {
 	case PSBT_ELEM_RECORD:
 		rec = elem->elem.rec;
 		type_str = psbt_type_tostr(rec->type, rec->scope);
-		printf("%s\n\t", type_str);
+		printf("%s\t", type_str);
 		if (rec->key_size != 0) {
 			hex_print(rec->key, rec->key_size);
-			printf(": ");
+			printf(" ");
 		}
 		hex_print(rec->val, rec->val_size);
 		printf("\n");
@@ -44,23 +44,30 @@ void print_rec(struct psbt_elem *elem) {
 	case PSBT_ELEM_TXELEM:
 		txelem = elem->elem.txelem;
 		type_str = psbt_txelem_type_tostr(txelem->elem_type);
-		printf("%s\n\t", type_str);
+		printf("%s\t", type_str);
 		switch (txelem->elem_type) {
 		case PSBT_TXELEM_TXIN:
 			txin = txelem->elem.txin;
 			hex_print(txin->txid, 32);
-			printf(" index:%d", txin->index);
-			printf(" seq_num:%u", txin->sequence_number);
+			printf(" %d", txin->index);
+			printf(" %u", txin->sequence_number);
+			if (txin->script_len) {
+				printf(" ");
+				hex_print(txin->script, txin->script_len);
+			}
 			printf("\n");
 			break;
 		case PSBT_TXELEM_TXOUT:
 			txout = txelem->elem.txout;
-			printf("amount:%"PRIu64"\n", txout->amount);
+			if (txout->script_len) {
+				hex_print(txout->script, txout->script_len);
+				printf(" ");
+			}
+			printf("%"PRIu64"\n", txout->amount);
 			break;
 		case PSBT_TXELEM_TX:
 			tx = txelem->elem.tx;
-			printf("v:%u lock_time:%u\n", tx->version,
-				tx->lock_time);
+			printf("%u %u\n", tx->version, tx->lock_time);
 			break;
 		default:
 			break;
