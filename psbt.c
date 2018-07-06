@@ -450,7 +450,7 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 
 	if (tx->state != PSBT_ST_FINALIZED) {
 		psbt_errmsg = "psbt_read: invalid psbt";
-		return PSBT_READ_ERROR;
+		return PSBT_INVALID_STATE;
 	}
 	else if (tx->state == PSBT_ST_FINALIZED && *tx->write_pos != 0) {
 		psbt_errmsg = "psbt_read: expected null byte at end of psbt";

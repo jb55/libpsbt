@@ -40,7 +40,8 @@ int usage() {
 
 #define CHECK(res) \
 	if ((res) != PSBT_OK) {					\
-		printf("error (%d): %s\n", res, psbt_errmsg);	\
+		printf("error (%d): %s. last_state = %s\n", res, psbt_errmsg, \
+		       psbt_state_tostr(psbt.state));			\
 		return 1;					\
 	}
 
@@ -69,17 +70,7 @@ int main(int argc, char *argv[])
 	res = psbt_encode(&psbt, PSBT_ENCODING_HEX, buffer, 4096, &out_len);
 	CHECK(res);
 
-	if (res != PSBT_OK) {
-		printf("error (%d): %s\n", res, psbt_errmsg);
-		return 1;
-	}
-
 	/* printf("%.*s\n", (int)out_len, (char*)buffer); */
-
-	if (res != PSBT_OK) {
-		printf("error (%d): %s\n", res, psbt_errmsg);
-		return 1;
-	}
 
 	return 0;
 }
