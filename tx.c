@@ -19,12 +19,12 @@
 
 static u32
 parse_le32(const u8 *cursor) {
-	return le32toh(*cursor);
+	return le32toh(*(u32*)cursor);
 }
 
 static u64
 parse_le64(const u8 *cursor) {
-	return le64toh(*cursor);
+	return le64toh(*(u64*)cursor);
 }
 
 static enum psbt_result
@@ -133,7 +133,7 @@ parse_witness_item(u8 **cursor, u8 *data, u32 data_size,
 enum psbt_result
 psbt_btc_tx_parse(u8 *data, u32 data_size, void *user_data,
 		  psbt_txelem_handler *handler) {
-	struct psbt_btc_tx tx;
+	struct psbt_tx tx;
 	enum psbt_result res = PSBT_OK;
 	struct psbt_txin txin;
 	struct psbt_txout txout;

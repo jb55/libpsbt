@@ -215,6 +215,22 @@ psbt_global_type_tostr(enum psbt_global_type type) {
 }
 
 const char *
+psbt_txelem_type_tostr(enum psbt_txelem_type txelem_type) {
+	switch (txelem_type) {
+	case PSBT_TXELEM_TX:
+		return "TX";
+	case PSBT_TXELEM_TXIN:
+		return "TXIN";
+	case PSBT_TXELEM_TXOUT:
+		return "TXOUT";
+	case PSBT_TXELEM_WITNESS_ITEM:
+		return "WITNESS_ITEM";
+	}
+
+	return "UNKNOWN_TXELEM";
+}
+
+const char *
 psbt_type_tostr(unsigned char type, enum psbt_scope scope) {
 	switch (scope) {
 	case PSBT_SCOPE_GLOBAL:
@@ -302,6 +318,8 @@ psbt_read_record(struct psbt *tx, size_t src_size, struct psbt_record *rec)
 struct psbt_tx_counter {
 	int inputs;
 	int outputs;
+	void *user_data;
+	psbt_elem_handler *handler;
 } counter;
 
 static void hex_print(unsigned char *data, size_t len) {
@@ -311,20 +329,22 @@ static void hex_print(unsigned char *data, size_t len) {
 
 
 static void tx_counter(struct psbt_txelem *elem) {
+	struct psbt_elem psbt_elem;
 	struct psbt_tx_counter *counter =
 		(struct psbt_tx_counter *)elem->user_data;
 
+	psbt_elem.user_data = counter->user_data;
+	psbt_elem.type = PSBT_ELEM_TXELEM;
+	psbt_elem.elem.txelem = elem;
+
+	// forward txelem events to user
+	counter->handler(&psbt_elem);
+
 	switch (elem->elem_type) {
 	case PSBT_TXELEM_TXIN:
-		/* printf("txin id "); */
-		/* hex_print(elem->elem.txin->txid, 32); */
-		/* printf("\n"); */
-		/* printf("seq_number %u\n", elem->elem.txin->sequence_number); */
-		/* printf("index %d\n", elem->elem.txin->index); */
 		counter->inputs++;
 		return;
 	case PSBT_TXELEM_TXOUT:
-		/* printf("amount %"PRIu64"\n", elem->elem.txout->amount); */
 		counter->outputs++;
 		return;
 	default:
@@ -334,16 +354,23 @@ static void tx_counter(struct psbt_txelem *elem) {
 
 enum psbt_result
 psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
-	  psbt_record_handler *rec_cb, void* user_data)
+	  psbt_elem_handler *elem_handler, void* user_data)
 {
 	struct psbt_record rec;
 	enum psbt_result res;
+
+	struct psbt_elem elem;
+	elem.type = PSBT_ELEM_RECORD;
+	elem.user_data = user_data;
+
 	int input_kvs = 0, output_kvs = 0;
 	u8 *end;
 
 	struct psbt_tx_counter counter = {
 		.inputs = 0,
 		.outputs = 0,
+		.user_data = user_data,
+		.handler = elem_handler,
 	};
 
 	if (tx->state != PSBT_ST_INIT) {
@@ -423,8 +450,12 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 						return res;
 				}
 
-				if (rec_cb)
-					rec_cb(user_data, &rec);
+				// record callback
+				if (elem_handler) {
+					elem.type = PSBT_ELEM_RECORD;
+					elem.elem.rec = &rec;
+					elem_handler(&elem);
+				}
 			}
 
 

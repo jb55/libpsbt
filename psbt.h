@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include "result.h"
+#include "tx.h"
 
 enum psbt_global_type {
 	PSBT_GLOBAL_UNSIGNED_TX = 0
@@ -67,14 +68,28 @@ struct psbt_record {
 	enum psbt_scope scope;
 };
 
-typedef void (psbt_record_handler)(void *user_data, struct psbt_record *rec);
+enum psbt_elem_type {
+	PSBT_ELEM_RECORD,
+	PSBT_ELEM_TXELEM,
+};
+
+struct psbt_elem {
+	enum psbt_elem_type type;
+	void *user_data;
+	union {
+		struct psbt_txelem *txelem;
+		struct psbt_record *rec;
+	} elem;
+};
+
+typedef void (psbt_elem_handler)(struct psbt_elem *rec);
 
 size_t
 psbt_size(struct psbt *tx);
 
 enum psbt_result
 psbt_read(const unsigned char *src, size_t src_size, struct psbt *psbt,
-	  psbt_record_handler *rec_cb, void* user_data);
+	  psbt_elem_handler *elem_handler, void* user_data);
 
 enum psbt_result
 psbt_decode(const char *src, size_t src_size, unsigned char *dest,
@@ -97,6 +112,9 @@ psbt_state_tostr(enum psbt_state state);
 
 const char *
 psbt_type_tostr(unsigned char type, enum psbt_scope scope);
+
+const char *
+psbt_txelem_type_tostr(enum psbt_txelem_type txelem_type);
 
 const char *
 psbt_global_type_tostr(enum psbt_global_type type);

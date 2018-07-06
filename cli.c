@@ -1,6 +1,7 @@
 
 #include "psbt.h"
 #include "string.h"
+#include <inttypes.h>
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(arr[0]))
 
@@ -12,7 +13,7 @@ void print_json_rec(void *user_data, struct psbt_record *rec) {
 
 	/* for (int i = 0; i < rec->) */
 
-		printf("\"type\": \"%s\"", psbt_type_tostr(rec->type, rec->scope));
+	printf("\"type\": \"%s\"", psbt_type_tostr(rec->type, rec->scope));
 }
 
 static void hex_print(unsigned char *data, size_t len) {
@@ -20,17 +21,51 @@ static void hex_print(unsigned char *data, size_t len) {
 		printf("%02x", data[i]);
 }
 
-void print_rec(void *user_data, struct psbt_record *rec) {
-	(void)user_data;
-	const char *type_str = psbt_type_tostr(rec->type, rec->scope);
-	printf("%s (%d)\n\t", type_str, rec->type);
-	if (rec->key_size != 0) {
-		hex_print(rec->key, rec->key_size);
-		printf(": ");
-	}
-	hex_print(rec->val, rec->val_size);
-	printf("\n");
+void print_rec(struct psbt_elem *elem) {
+	const char *type_str = NULL;
+	struct psbt_record *rec = NULL;
+	struct psbt_txelem *txelem = NULL;
+	struct psbt_txin *txin = NULL;
+	struct psbt_txout *txout = NULL;
+	struct psbt_tx *tx = NULL;
 
+	switch (elem->type) {
+	case PSBT_ELEM_RECORD:
+		rec = elem->elem.rec;
+		type_str = psbt_type_tostr(rec->type, rec->scope);
+		printf("%s\n\t", type_str);
+		if (rec->key_size != 0) {
+			hex_print(rec->key, rec->key_size);
+			printf(": ");
+		}
+		hex_print(rec->val, rec->val_size);
+		printf("\n");
+		break;
+	case PSBT_ELEM_TXELEM:
+		txelem = elem->elem.txelem;
+		type_str = psbt_txelem_type_tostr(txelem->elem_type);
+		printf("%s\n\t", type_str);
+		switch (txelem->elem_type) {
+		case PSBT_TXELEM_TXIN:
+			txin = txelem->elem.txin;
+			hex_print(txin->txid, 32);
+			printf(" index:%d", txin->index);
+			printf(" seq_num:%u", txin->sequence_number);
+			printf("\n");
+			break;
+		case PSBT_TXELEM_TXOUT:
+			txout = txelem->elem.txout;
+			printf("amount:%"PRIu64"\n", txout->amount);
+			break;
+		case PSBT_TXELEM_TX:
+			tx = txelem->elem.tx;
+			printf("v:%u lock_time:%u\n", tx->version,
+				tx->lock_time);
+			break;
+		default:
+			break;
+		}
+	}
 }
 
 int usage() {
@@ -67,8 +102,10 @@ int main(int argc, char *argv[])
 	res = psbt_read(buffer, psbt_len, &psbt, print_rec, NULL);
 	CHECK(res);
 
-	res = psbt_encode(&psbt, PSBT_ENCODING_HEX, buffer, 4096, &out_len);
+	res = psbt_encode(&psbt, PSBT_ENCODING_BASE62, buffer, 4096, &out_len);
 	CHECK(res);
+
+	/* printf("%.*s", (int)out_len, buffer); */
 
 	/* printf("%.*s\n", (int)out_len, (char*)buffer); */
 
