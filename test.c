@@ -29,6 +29,11 @@ static const unsigned char expected_psbt[] = {0x70, 0x73, 0x62, 0x74, 0xff, 0x01
 	   exit(1); \
 	}
 
+static void hex_print(unsigned char *data, size_t len) {
+	for (size_t i = 0; i < len; ++i)
+		printf("%02x", data[i]);
+}
+
 void test_vector() {
 	struct psbt psbt;
 	unsigned char buffer[1024] = {0};
@@ -111,6 +116,7 @@ void read_test_vector() {
 
 	res = psbt_read(buf, psbt_len, &psbt, read_test_vector_checker, &step);
 	CHECKRES(res);
+
 }
 
 void encode_decode_test() {
@@ -121,22 +127,20 @@ void encode_decode_test() {
 	struct psbt psbt;
 	enum psbt_result res;
 
-	res = psbt_decode(psbt_hex, hexlen, buf, 2048, &psbt_len);
+	res = psbt_decode(psbt_hex, hexlen, intbuf, 2048, &psbt_len);
 	CHECKRES(res);
 
 	assert(psbt_len == hexlen / 2);
 
-	psbt_init(&psbt, intbuf, 2048);
+	psbt_init(&psbt, intbuf, psbt_len);
 
-	res = psbt_read(buf, psbt_len, &psbt, NULL, NULL);
+	res = psbt_read(intbuf, psbt_len, &psbt, NULL, NULL);
 	CHECKRES(res);
 
 	res = psbt_encode(&psbt, PSBT_ENCODING_HEX, buf, 2048, &psbt_len);
 	CHECKRES(res);
 
-	printf("psbt_len %ld hexlen %ld\n", psbt_len, hexlen);
-
-	assert(psbt_len == hexlen);
+	assert(psbt_len == hexlen + 1);
 	assert(memcmp(psbt_hex, buf, hexlen) == 0);
 }
 

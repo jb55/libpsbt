@@ -11,4 +11,8 @@ typedef unsigned int u32;
 
 static const unsigned int MAX_SERIALIZE_SIZE = 0x02000000;
 
+#define STRINGIZE_DETAIL(x) #x
+#define STRINGIZE(x) STRINGIZE_DETAIL(x)
+
+
 #endif /* PSBT_COMMON_H */

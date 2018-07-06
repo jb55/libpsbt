@@ -6,13 +6,12 @@
 #include <string.h>
 #include <endian.h>
 #include <assert.h>
+#include <inttypes.h>
 #include "compactsize.h"
+#include "tx.h"
 #include "base64.h"
 
 char *psbt_errmsg = NULL;
-
-#define STRINGIZE_DETAIL(x) #x
-#define STRINGIZE(x) STRINGIZE_DETAIL(x)
 
 #define ASSERT_SPACE(s) \
 	if (tx->write_pos+(s) > tx->data + tx->data_capacity) { \
@@ -300,14 +299,52 @@ psbt_read_record(struct psbt *tx, size_t src_size, struct psbt_record *rec)
 	return PSBT_OK;
 }
 
+struct psbt_tx_counter {
+	int inputs;
+	int outputs;
+} counter;
+
+static void hex_print(unsigned char *data, size_t len) {
+	for (size_t i = 0; i < len; ++i)
+		printf("%02x", data[i]);
+}
+
+
+static void tx_counter(struct psbt_txelem *elem) {
+	struct psbt_tx_counter *counter =
+		(struct psbt_tx_counter *)elem->user_data;
+
+	switch (elem->elem_type) {
+	case PSBT_TXELEM_TXIN:
+		/* printf("txin id "); */
+		/* hex_print(elem->elem.txin->txid, 32); */
+		/* printf("\n"); */
+		/* printf("seq_number %u\n", elem->elem.txin->sequence_number); */
+		/* printf("index %d\n", elem->elem.txin->index); */
+		counter->inputs++;
+		return;
+	case PSBT_TXELEM_TXOUT:
+		/* printf("amount %"PRIu64"\n", elem->elem.txout->amount); */
+		counter->outputs++;
+		return;
+	default:
+		return;
+	}
+}
 
 enum psbt_result
 psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
-	  psbt_record_cb *rec_cb, void* user_data)
+	  psbt_record_handler *rec_cb, void* user_data)
 {
 	struct psbt_record rec;
 	enum psbt_result res;
+	int input_kvs = 0, output_kvs = 0;
 	u8 *end;
+
+	struct psbt_tx_counter counter = {
+		.inputs = 0,
+		.outputs = 0,
+	};
 
 	if (tx->state != PSBT_ST_INIT) {
 		psbt_errmsg = "psbt_read: psbt not initialized, use psbt_init first";
@@ -351,11 +388,17 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 					break;
 
 				case PSBT_ST_INPUTS:
-					tx->state = PSBT_ST_OUTPUTS_NEW;
+					if (++input_kvs == counter.inputs)
+						tx->state = PSBT_ST_OUTPUTS_NEW;
+					else
+						tx->state = PSBT_ST_INPUTS_NEW;
 					break;
 
 				case PSBT_ST_OUTPUTS:
-					tx->state = PSBT_ST_FINALIZED;
+					if (++output_kvs == counter.outputs)
+						tx->state = PSBT_ST_FINALIZED;
+					else
+						tx->state = PSBT_ST_OUTPUTS_NEW;
 					break;
 
 				default:
@@ -367,6 +410,18 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 
 				if (res != PSBT_OK)
 					return res;
+
+				if (tx->state == PSBT_ST_GLOBAL &&
+				    rec.type == PSBT_GLOBAL_UNSIGNED_TX) {
+					// parse transaction for number of inputs/outputs
+					res = psbt_btc_tx_parse(rec.val,
+								rec.val_size,
+								(void*)&counter,
+								tx_counter);
+
+					if (res != PSBT_OK)
+						return res;
+				}
 
 				if (rec_cb)
 					rec_cb(user_data, &rec);
@@ -388,6 +443,7 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 			break;
 
 		case PSBT_ST_FINALIZED:
+			assert(!"impossible");
 			break;
 		}
 	}
@@ -396,6 +452,12 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 		psbt_errmsg = "psbt_read: invalid psbt";
 		return PSBT_READ_ERROR;
 	}
+	else if (tx->state == PSBT_ST_FINALIZED && *tx->write_pos != 0) {
+		psbt_errmsg = "psbt_read: expected null byte at end of psbt";
+		return PSBT_READ_ERROR;
+	}
+
+	tx->write_pos++;
 
 	return PSBT_OK;
 }
@@ -573,6 +635,7 @@ psbt_decode(const char *src, size_t src_size, unsigned char *dest,
 		return PSBT_READ_ERROR;
 	}
 
+	// base64 detection
 	if (memcmp(src, "cHNid", b64_magic_size) == 0) {
 		u8 *c = base64_decode((unsigned char*)src, src_size, dest,
 					dest_size, psbt_size);
@@ -581,6 +644,15 @@ psbt_decode(const char *src, size_t src_size, unsigned char *dest,
 
 	*psbt_size = src_size / 2;
 	return psbt_hex_decode(src, src_size, dest, dest_size);
+}
+
+static char hexchar(unsigned int val)
+{
+	if (val < 10)
+		return '0' + val;
+	if (val < 16)
+		return 'a' + val - 10;
+	assert(!"hexchar invalid val");
 }
 
 static enum psbt_result
@@ -592,8 +664,8 @@ hex_encode(u8 *buf, size_t bufsize, u8 *dest, size_t dest_size) {
 
 	for (i = 0; i < bufsize; i++) {
 		unsigned int c = buf[i];
-		*(dest++) = hexdigit(c >> 4);
-		*(dest++) = hexdigit(c & 0xF);
+		*(dest++) = hexchar(c >> 4);
+		*(dest++) = hexchar(c & 0xF);
 	}
 	*dest = '\0';
 
@@ -621,7 +693,7 @@ psbt_encode_raw(unsigned char *psbt_data, size_t psbt_len,
 	switch (encoding) {
 	case PSBT_ENCODING_HEX:
 		res = hex_encode(psbt_data, psbt_len, dest, dest_size);
-		*out_len = psbt_len * 2;
+		*out_len = psbt_len * 2 + 1;
 		return res;
 	case PSBT_ENCODING_BASE64:
 		c = base64_encode(psbt_data, psbt_len, dest, dest_size, out_len);

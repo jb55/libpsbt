@@ -3,16 +3,7 @@
 
 #include <stddef.h>
 #include <stdio.h>
-
-enum psbt_result {
-	PSBT_OK,
-	PSBT_COMPACT_READ_ERROR,
-	PSBT_READ_ERROR,
-	PSBT_WRITE_ERROR,
-	PSBT_INVALID_STATE,
-	PSBT_NOT_IMPLEMENTED,
-	PSBT_OOB_WRITE
-};
+#include "result.h"
 
 enum psbt_global_type {
 	PSBT_GLOBAL_UNSIGNED_TX = 0
@@ -76,14 +67,14 @@ struct psbt_record {
 	enum psbt_scope scope;
 };
 
-typedef void (psbt_record_cb)(void *user_data, struct psbt_record *rec);
+typedef void (psbt_record_handler)(void *user_data, struct psbt_record *rec);
 
 size_t
 psbt_size(struct psbt *tx);
 
 enum psbt_result
 psbt_read(const unsigned char *src, size_t src_size, struct psbt *psbt,
-	  psbt_record_cb *rec_cb, void* user_data);
+	  psbt_record_handler *rec_cb, void* user_data);
 
 enum psbt_result
 psbt_decode(const char *src, size_t src_size, unsigned char *dest,
