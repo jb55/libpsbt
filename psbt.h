@@ -76,6 +76,7 @@ enum psbt_elem_type {
 struct psbt_elem {
 	enum psbt_elem_type type;
 	void *user_data;
+	int index;
 	union {
 		struct psbt_txelem *txelem;
 		struct psbt_record *rec;

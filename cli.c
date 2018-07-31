@@ -33,7 +33,7 @@ void print_rec(struct psbt_elem *elem) {
 	case PSBT_ELEM_RECORD:
 		rec = elem->elem.rec;
 		type_str = psbt_type_tostr(rec->type, rec->scope);
-		printf("%s\t", type_str);
+		printf("%s\t%d ", type_str, elem->index);
 		if (rec->key_size != 0) {
 			hex_print(rec->key, rec->key_size);
 			printf(" ");

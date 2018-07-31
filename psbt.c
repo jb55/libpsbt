@@ -363,7 +363,7 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 	elem.type = PSBT_ELEM_RECORD;
 	elem.user_data = user_data;
 
-	int input_kvs = 0, output_kvs = 0;
+	int kvs = 0;
 	u8 *end;
 
 	struct psbt_tx_counter counter = {
@@ -415,14 +415,15 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 					break;
 
 				case PSBT_ST_INPUTS:
-					if (++input_kvs == counter.inputs)
+					if (++kvs == counter.inputs) {
 						tx->state = PSBT_ST_OUTPUTS_NEW;
-					else
+						kvs = 0;
+					} else
 						tx->state = PSBT_ST_INPUTS_NEW;
 					break;
 
 				case PSBT_ST_OUTPUTS:
-					if (++output_kvs == counter.outputs)
+					if (++kvs == counter.outputs)
 						tx->state = PSBT_ST_FINALIZED;
 					else
 						tx->state = PSBT_ST_OUTPUTS_NEW;
@@ -453,6 +454,7 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 				// record callback
 				if (elem_handler) {
 					elem.type = PSBT_ELEM_RECORD;
+					elem.index = kvs;
 					elem.elem.rec = &rec;
 					elem_handler(&elem);
 				}
