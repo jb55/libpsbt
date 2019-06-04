@@ -16,6 +16,11 @@ void print_json_rec(void *user_data, struct psbt_record *rec) {
 	printf("\"type\": \"%s\"", psbt_type_tostr(rec->type, rec->scope));
 }
 
+static void txid_print(unsigned char *data) {
+	for (int i = 31; i >= 0; i--)
+		printf("%02x", data[i]);
+}
+
 static void hex_print(unsigned char *data, size_t len) {
 	for (size_t i = 0; i < len; ++i)
 		printf("%02x", data[i]);
@@ -48,7 +53,7 @@ void print_rec(struct psbt_elem *elem) {
 		switch (txelem->elem_type) {
 		case PSBT_TXELEM_TXIN:
 			txin = txelem->elem.txin;
-			hex_print(txin->txid, 32);
+			txid_print(txin->txid);
 			printf(" ind:%d", txin->index);
 			printf(" seq:%u", txin->sequence_number);
 			if (txin->script_len) {
