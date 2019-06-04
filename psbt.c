@@ -338,7 +338,8 @@ static void tx_counter(struct psbt_txelem *elem) {
 	psbt_elem.elem.txelem = elem;
 
 	// forward txelem events to user
-	counter->handler(&psbt_elem);
+	if (counter->handler)
+		counter->handler(&psbt_elem);
 
 	switch (elem->elem_type) {
 	case PSBT_TXELEM_TXIN:
