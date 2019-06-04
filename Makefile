@@ -42,7 +42,7 @@ install: $(STATICLIB) $(SHLIB)
 check: test
 	@./test
 
-test: test.c $(OBJS)
+test: test.c $(STATICLIB)
 	$(CC) $(CFLAGS) test.c $(OBJS) -o $@
 
 TAGS:
