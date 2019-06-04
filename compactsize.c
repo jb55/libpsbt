@@ -29,42 +29,42 @@ u32 compactsize_length(u64 data) {
 		return sizeof(u8) + sizeof(u64);
 }
 
-inline void serialize_u8(u8 *dest, u8 data) {
+inline static void serialize_u8(u8 *dest, u8 data) {
 	*dest = data;
 }
 
-inline void serialize_u16(u8 *dest, u16 data) {
+inline static void serialize_u16(u8 *dest, u16 data) {
 	data = htole16(data);
 	memcpy(dest, &data, sizeof(data));
 }
 
-inline void serialize_u32(u8 *dest, u32 data) {
+inline static void serialize_u32(u8 *dest, u32 data) {
 	data = htole32(data);
 	memcpy(dest, &data, sizeof(data));
 }
 
-inline void serialize_u64(u8 *dest, u64 data) {
+inline static void serialize_u64(u8 *dest, u64 data) {
 	data = htole64(data);
 	memcpy(dest, &data, sizeof(data));
 }
 
-inline u8 deserialize_u8(u8 *src) {
+inline static u8 deserialize_u8(u8 *src) {
 	return *src;
 }
 
-inline u16 deserialize_u16(u8 *src) {
+inline static u16 deserialize_u16(u8 *src) {
 	u16 data;
 	memcpy(&data, src, sizeof(data));
 	return le16toh(data);
 }
 
-inline u32 deserialize_u32(u8 *src) {
+inline static u32 deserialize_u32(u8 *src) {
 	u32 data;
 	memcpy(&data, src, sizeof(data));
 	return le32toh(data);
 }
 
-inline u64 deserialize_u64(u8 *src) {
+inline static u64 deserialize_u64(u8 *src) {
 	u64 data;
 	memcpy(&data, src, sizeof(data));
 	return le64toh(data);
