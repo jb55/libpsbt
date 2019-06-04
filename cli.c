@@ -49,8 +49,8 @@ void print_rec(struct psbt_elem *elem) {
 		case PSBT_TXELEM_TXIN:
 			txin = txelem->elem.txin;
 			hex_print(txin->txid, 32);
-			printf(" %d", txin->index);
-			printf(" %u", txin->sequence_number);
+			printf(" ind:%d", txin->index);
+			printf(" seq:%u", txin->sequence_number);
 			if (txin->script_len) {
 				printf(" ");
 				hex_print(txin->script, txin->script_len);
@@ -63,11 +63,11 @@ void print_rec(struct psbt_elem *elem) {
 				hex_print(txout->script, txout->script_len);
 				printf(" ");
 			}
-			printf("%"PRIu64"\n", txout->amount);
+			printf("amount:%"PRIu64"\n", txout->amount);
 			break;
 		case PSBT_TXELEM_TX:
 			tx = txelem->elem.tx;
-			printf("%u %u\n", tx->version, tx->lock_time);
+			printf("ver:%u locktime:%u\n", tx->version, tx->lock_time);
 			break;
 		default:
 			break;
