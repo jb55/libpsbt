@@ -4,7 +4,7 @@ BIN = psbt
 STATICLIB ?= $(NAME).a
 PREFIX ?= /usr/local
 
-CFLAGS = -g -O2 -fpic -Wall -Werror -Wextra -std=c99 \
+CFLAGS = -g -O1 -fpic -Wall -Werror -Wextra -std=c99 \
 						-Wno-unused-function \
 						-Wno-unused-parameter \
 						-Wno-unused-variable \

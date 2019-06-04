@@ -85,15 +85,21 @@ void test_vector() {
 	CHECKRES(res);
 }
 
-void read_test_vector_checker(void *user_data, struct psbt_record *rec) {
-	int *step = (int*)user_data;
+void read_test_vector_checker(struct psbt_elem *elem) {
+	int *step = (int*)elem->user_data;
 
-	switch (*step) {
-	case 0:
-		assert(rec->type == PSBT_GLOBAL_UNSIGNED_TX);
+	switch (elem->type) {
+	case PSBT_ELEM_RECORD:
+		switch (*step) {
+		case 0:
+			assert(elem->elem.rec->type == PSBT_GLOBAL_UNSIGNED_TX);
+			break;
+		case 1:
+			assert(elem->elem.rec->type == PSBT_IN_NON_WITNESS_UTXO);
+			break;
+		}
 		break;
-	case 1:
-		assert(rec->type == PSBT_IN_NON_WITNESS_UTXO);
+	default:
 		break;
 	}
 
