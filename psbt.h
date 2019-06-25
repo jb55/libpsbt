@@ -150,8 +150,7 @@ psbt_print(struct psbt *tx, FILE *stream);
 enum psbt_result
 psbt_finalize(struct psbt *tx);
 
-#define PSBT_MAGIC 0x70736274
-
+extern const unsigned char PSBT_MAGIC[4];
 
 extern char *psbt_errmsg;
 

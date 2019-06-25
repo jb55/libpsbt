@@ -9,6 +9,14 @@
 #include <assert.h>
 #include <string.h>
 
+
+#ifdef DEBUG
+#define debug(...) fprintf(stderr, __VA_ARGS__)
+#else
+#define debug(...)
+#endif
+
+
 #define SEGREGATED_WITNESS_FLAG 0x1
 
 #define ASSERT_SPACE(s)							\
@@ -163,28 +171,8 @@ psbt_btc_tx_parse(u8 *data, u32 data_size, void *user_data,
 
 	p += size_len;
 
-	// BIP 144 marker is 0 (impossible to hax tx with 0 inputs)
-	if (count == 0) {
-		ASSERT_SPACE(1);
-		flag = *p++;
-		if (flag != SEGREGATED_WITNESS_FLAG) {
-			psbt_errmsg = "psbt_btc_tx_parse: 0 inputs with "
-                                      "unexpected segwit flag";
-			return PSBT_READ_ERROR;
-		}
-
-		ASSERT_SPACE(1);
-		size_len = compactsize_peek_length(*p);
-
-		ASSERT_SPACE(size_len);
-		count = compactsize_read(p, &res);
-		if (res != PSBT_OK)
-			return res;
-
-		p += size_len;
-	}
-
 	inputs = count;
+	debug("parsing %zu inputs\n", count);
 
 	// parse inputs
 	for (i = 0; i < count; i++) {

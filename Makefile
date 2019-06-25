@@ -40,7 +40,7 @@ install: $(STATICLIB) $(SHLIB)
 	install psbt.h $(PREFIX)/include
 
 check: test
-	@./test
+	./test
 
 test: test.c $(STATICLIB)
 	$(CC) $(CFLAGS) test.c $(OBJS) -o $@
@@ -49,6 +49,6 @@ TAGS:
 	etags *.c
 
 clean:
-	rm -f $(OBJS) $(SHLIB) *.d*
+	rm -f $(OBJS) $(SHLIB) $(BIN) $(STATICLIB) *.d*
 
 .PHONY: TAGS

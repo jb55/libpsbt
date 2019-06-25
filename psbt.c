@@ -11,7 +11,15 @@
 #include "tx.h"
 #include "base64.h"
 
+#ifdef DEBUG
+  #define debug(...) fprintf(stderr, __VA_ARGS__)
+#else
+  #define debug(...)
+#endif
+
 char *psbt_errmsg = NULL;
+
+const unsigned char PSBT_MAGIC[4] = {0x70, 0x73, 0x62, 0x74};
 
 #define ASSERT_SPACE(s) \
 	if (tx->write_pos+(s) > tx->data + tx->data_capacity) { \
@@ -23,14 +31,18 @@ size_t psbt_size(struct psbt *tx) {
 	return tx->write_pos - tx->data;
 }
 
+static void hex_print(unsigned char *data, size_t len) {
+	for (size_t i = 0; i < len; ++i)
+		printf("%02x", data[i]);
+}
+
+
 
 static enum psbt_result
 psbt_write_header(struct psbt *tx) {
-	u32 magic = htobe32(PSBT_MAGIC);
-
-	ASSERT_SPACE(sizeof(magic));
-	memcpy(tx->write_pos, &magic, sizeof(magic));
-	tx->write_pos += sizeof(magic);
+	ASSERT_SPACE(sizeof(PSBT_MAGIC));
+	memcpy(tx->write_pos, PSBT_MAGIC, sizeof(PSBT_MAGIC));
+	tx->write_pos += sizeof(PSBT_MAGIC);
 
 	ASSERT_SPACE(1);
 	*tx->write_pos = 0xff;
@@ -124,14 +136,18 @@ static enum psbt_result
 psbt_read_header(struct psbt *tx) {
 	ASSERT_SPACE(4);
 
-	u32 magic = be32toh(*((u32*)tx->write_pos));
+	debug("magic %02X %02X %02X %02X\n",
+		*tx->write_pos,
+		*(tx->write_pos+1),
+		*(tx->write_pos+2),
+		*(tx->write_pos+3));
 
-	tx->write_pos += 4;
-
-	if (magic != PSBT_MAGIC) {
+	if (memcmp(tx->write_pos, PSBT_MAGIC, sizeof(PSBT_MAGIC)) != 0) {
 		psbt_errmsg = "psbt_read: invalid magic header";
 		return PSBT_READ_ERROR;
 	}
+
+	tx->write_pos += 4;
 
 	if (*tx->write_pos++ != 0xff) {
 		psbt_errmsg = "psbt_read: no 0xff found after magic";
@@ -244,7 +260,6 @@ psbt_type_tostr(unsigned char type, enum psbt_scope scope) {
 	return "UNKNOWN_SCOPE";
 }
 
-
 static enum psbt_result
 psbt_read_record(struct psbt *tx, size_t src_size, struct psbt_record *rec)
 {
@@ -259,6 +274,9 @@ psbt_read_record(struct psbt *tx, size_t src_size, struct psbt_record *rec)
 
 	tx->write_pos += size_len;
 
+	debug("record pos %zu size_len %d size %"PRIu64"\n",
+	      tx->write_pos - tx->data, size_len, size);
+
 	if (res != PSBT_OK)
 		return res;
 
@@ -272,7 +290,13 @@ psbt_read_record(struct psbt *tx, size_t src_size, struct psbt_record *rec)
 	rec->key_size = size - 1; // don't include type in key size
 	rec->type = *tx->write_pos;
 	rec->key = tx->write_pos + 1;
+
 	tx->write_pos += size;
+	debug("%02x %02x %02x %02x %02x\n", *(tx->write_pos-2), *(tx->write_pos-1),
+	      *tx->write_pos, *(tx->write_pos+1), *(tx->write_pos+2));
+
+	debug("record pos %zu size_len %d size %"PRIu64"\n",
+	      tx->write_pos - tx->data, size_len, size);
 
 	switch (tx->state) {
 		case PSBT_ST_GLOBAL:
@@ -293,6 +317,7 @@ psbt_read_record(struct psbt *tx, size_t src_size, struct psbt_record *rec)
 	}
 
 	size_len = compactsize_peek_length(*tx->write_pos);
+
 	ASSERT_SPACE(size_len);
 	size = compactsize_read(tx->write_pos, &res);
 
@@ -321,12 +346,6 @@ struct psbt_tx_counter {
 	void *user_data;
 	psbt_elem_handler *handler;
 } counter;
-
-static void hex_print(unsigned char *data, size_t len) {
-	for (size_t i = 0; i < len; ++i)
-		printf("%02x", data[i]);
-}
-
 
 static void tx_counter(struct psbt_txelem *elem) {
 	struct psbt_elem psbt_elem;
@@ -400,6 +419,7 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 	while (tx->state != PSBT_ST_FINALIZED && tx->write_pos <= end) {
 		switch(tx->state) {
 		case PSBT_ST_INIT:
+			debug("reading header at %zu\n", tx->write_pos - tx->data);
 			res = psbt_read_header(tx);
 			if (res != PSBT_OK)
 				return res;
@@ -416,7 +436,7 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 					break;
 
 				case PSBT_ST_INPUTS:
-					if (++kvs == counter.inputs) {
+					if (++kvs >= counter.inputs) {
 						tx->state = PSBT_ST_OUTPUTS_NEW;
 						kvs = 0;
 					} else
@@ -424,7 +444,7 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 					break;
 
 				case PSBT_ST_OUTPUTS:
-					if (++kvs == counter.outputs)
+					if (++kvs >= counter.outputs)
 						tx->state = PSBT_ST_FINALIZED;
 					else
 						tx->state = PSBT_ST_OUTPUTS_NEW;
@@ -435,6 +455,7 @@ psbt_read(const unsigned char *src, size_t src_size, struct psbt *tx,
 				}
 			}
 			else {
+				debug("reading record @ %zu\n", tx->write_pos - tx->data);
 				res = psbt_read_record(tx, src_size, &rec);
 
 				if (res != PSBT_OK)
